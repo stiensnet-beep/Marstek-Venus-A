@@ -1,0 +1,413 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "com.stiensnet.marstek",
+  "version": "0.1.0",
+  "sdk": 3,
+  "compatibility": ">=5.0.0",
+  "platforms": [
+    "local"
+  ],
+  "name": {
+    "en": "Marstek Venus (BETA)",
+    "nl": "Marstek Venus (BETA)"
+  },
+  "description": {
+    "en": "BETA - Control a Marstek Venus A or Venus E home battery over the local UDP API (official Marstek Device Open API) and use it in your Homey flows.",
+    "nl": "BETA - Bedien een Marstek Venus A of Venus E thuisbatterij via de lokale UDP API (officiele Marstek Device Open API) en gebruik deze in je Homey flows."
+  },
+  "category": [
+    "energy"
+  ],
+  "tags": {
+    "en": [
+      "beta",
+      "battery",
+      "marstek",
+      "venus",
+      "home battery",
+      "energy"
+    ],
+    "nl": [
+      "batterij",
+      "thuisbatterij",
+      "marstek",
+      "venus",
+      "energie"
+    ]
+  },
+  "brandColor": "#0AA3E0",
+  "author": {
+    "name": "JPD"
+  },
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "flow": {
+    "conditions": [
+      {
+        "title": {
+          "en": "Battery mode is",
+          "nl": "Batterijmodus is"
+        },
+        "titleFormatted": {
+          "en": "Battery mode is [[mode]]",
+          "nl": "Batterijmodus is [[mode]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=venus_a",
+            "title": {
+              "en": "Battery",
+              "nl": "Batterij"
+            }
+          },
+          {
+            "name": "mode",
+            "type": "dropdown",
+            "title": {
+              "en": "Mode",
+              "nl": "Modus"
+            },
+            "values": [
+              {
+                "id": "Auto",
+                "title": {
+                  "en": "Auto (self consumption)"
+                }
+              },
+              {
+                "id": "AI",
+                "title": {
+                  "en": "AI"
+                }
+              },
+              {
+                "id": "UPS",
+                "title": {
+                  "en": "UPS (backup)"
+                }
+              },
+              {
+                "id": "Manual",
+                "title": {
+                  "en": "Manual (schedule / fixed power)"
+                }
+              },
+              {
+                "id": "Passive",
+                "title": {
+                  "en": "Passive (external control)"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "mode_is"
+      }
+    ],
+    "actions": [
+      {
+        "title": {
+          "en": "Set battery mode",
+          "nl": "Batterijmodus instellen"
+        },
+        "titleFormatted": {
+          "en": "Set mode to [[mode]]",
+          "nl": "Batterijmodus instellen op [[mode]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=venus_a",
+            "title": {
+              "en": "Battery",
+              "nl": "Batterij"
+            }
+          },
+          {
+            "name": "mode",
+            "type": "dropdown",
+            "title": {
+              "en": "Mode",
+              "nl": "Modus"
+            },
+            "values": [
+              {
+                "id": "Auto",
+                "title": {
+                  "en": "Auto (self consumption)"
+                }
+              },
+              {
+                "id": "AI",
+                "title": {
+                  "en": "AI"
+                }
+              },
+              {
+                "id": "UPS",
+                "title": {
+                  "en": "UPS (backup)"
+                }
+              },
+              {
+                "id": "Manual",
+                "title": {
+                  "en": "Manual (schedule / fixed power)"
+                }
+              },
+              {
+                "id": "Passive",
+                "title": {
+                  "en": "Passive (external control)"
+                }
+              }
+            ]
+          }
+        ],
+        "id": "set_mode"
+      }
+    ],
+    "triggers": [
+      {
+        "id": "mode_changed",
+        "title": {
+          "en": "Battery mode changed",
+          "nl": "Batterijmodus is gewijzigd"
+        },
+        "tokens": [
+          {
+            "name": "mode",
+            "type": "string",
+            "title": {
+              "en": "New mode",
+              "nl": "Nieuwe modus"
+            }
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=venus_a"
+          }
+        ]
+      }
+    ]
+  },
+  "drivers": [
+    {
+      "id": "venus_a",
+      "name": {
+        "en": "Marstek Venus A",
+        "nl": "Marstek Venus A"
+      },
+      "class": "socket",
+      "capabilities": [
+        "onoff",
+        "measure_battery",
+        "measure_power"
+      ],
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "On / off",
+            "nl": "Aan / uit"
+          }
+        },
+        "measure_battery": {
+          "title": {
+            "en": "Battery level",
+            "nl": "Batterijniveau"
+          }
+        },
+        "measure_power": {
+          "title": {
+            "en": "Battery power",
+            "nl": "Batterijvermogen"
+          }
+        }
+      },
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "images": {
+        "small": "/drivers/venus_a/assets/images/small.png",
+        "large": "/drivers/venus_a/assets/images/large.png",
+        "xlarge": "/drivers/venus_a/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "start"
+        }
+      ],
+      "settings": [
+        {
+          "type": "group",
+          "label": {
+            "en": "Connection",
+            "nl": "Verbinding"
+          },
+          "children": [
+            {
+              "id": "host",
+              "type": "text",
+              "label": {
+                "en": "IP address",
+                "nl": "IP-adres"
+              },
+              "value": "",
+              "hint": {
+                "en": "Local IP address of the battery, e.g. 192.168.1.50",
+                "nl": "Lokaal IP-adres van de batterij, bijvoorbeeld 192.168.1.50"
+              }
+            },
+            {
+              "id": "port",
+              "type": "number",
+              "label": {
+                "en": "UDP port",
+                "nl": "UDP-poort"
+              },
+              "value": 30000,
+              "min": 1,
+              "max": 65535
+            },
+            {
+              "id": "poll_interval",
+              "type": "number",
+              "label": {
+                "en": "Poll interval (seconds, 0 = off)",
+                "nl": "Poll-interval (seconden, 0 = uit)"
+              },
+              "value": 60,
+              "min": 0,
+              "max": 3600,
+              "hint": {
+                "en": "How often the battery is polled. Keep this at 60 seconds or more: the local UDP server of these batteries stops answering when polled too often.",
+                "nl": "Hoe vaak de batterij wordt uitgelezen. Houd dit op 60 seconden of meer: de lokale UDP-server van deze batterijen stopt met antwoorden bij te vaak pollen."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "On / off mapping",
+            "nl": "Aan / uit koppeling"
+          },
+          "children": [
+            {
+              "id": "mode_on",
+              "type": "dropdown",
+              "label": {
+                "en": "Mode when switched ON",
+                "nl": "Modus bij INSCHAKELEN"
+              },
+              "value": "Auto",
+              "values": [
+                {
+                  "id": "Auto",
+                  "label": {
+                    "en": "Auto (self consumption)"
+                  }
+                },
+                {
+                  "id": "AI",
+                  "label": {
+                    "en": "AI"
+                  }
+                },
+                {
+                  "id": "UPS",
+                  "label": {
+                    "en": "UPS (backup)"
+                  }
+                },
+                {
+                  "id": "Manual",
+                  "label": {
+                    "en": "Manual (schedule / fixed power)"
+                  }
+                },
+                {
+                  "id": "Passive",
+                  "label": {
+                    "en": "Passive (external control)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "mode_off",
+              "type": "dropdown",
+              "label": {
+                "en": "Mode when switched OFF",
+                "nl": "Modus bij UITSCHAKELEN"
+              },
+              "value": "Manual",
+              "values": [
+                {
+                  "id": "Manual",
+                  "label": {
+                    "en": "Manual (schedule disabled = battery idle)"
+                  }
+                },
+                {
+                  "id": "UPS",
+                  "label": {
+                    "en": "UPS (backup disabled)"
+                  }
+                },
+                {
+                  "id": "Passive",
+                  "label": {
+                    "en": "Passive (0 W, external control)"
+                  }
+                },
+                {
+                  "id": "Auto",
+                  "label": {
+                    "en": "Auto with auto_cfg disabled"
+                  }
+                },
+                {
+                  "id": "AI",
+                  "label": {
+                    "en": "AI with ai_cfg disabled"
+                  }
+                }
+              ],
+              "hint": {
+                "en": "The mode is applied with its sub-configuration switched OFF (enable = 0). Manual with no active schedule makes the battery idle.",
+                "nl": "De modus wordt gezet met de sub-configuratie UIT (enable = 0). Manual zonder actief schema laat de batterij niets doen."
+              }
+            },
+            {
+              "id": "manual_power",
+              "type": "number",
+              "label": {
+                "en": "Power used in Manual mode (W)",
+                "nl": "Vermogen in Manual-modus (W)"
+              },
+              "value": 800,
+              "min": 0,
+              "max": 5000,
+              "hint": {
+                "en": "Only used when the on/off mapping uses the Manual mode",
+                "nl": "Wordt alleen gebruikt als de aan/uit koppeling de Manual-modus gebruikt"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

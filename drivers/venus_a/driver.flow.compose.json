@@ -1,0 +1,21 @@
+{
+  "triggers": [
+    {
+      "id": "mode_changed",
+      "title": {
+        "en": "Battery mode changed",
+        "nl": "Batterijmodus is gewijzigd"
+      },
+      "tokens": [
+        {
+          "name": "mode",
+          "type": "string",
+          "title": {
+            "en": "New mode",
+            "nl": "Nieuwe modus"
+          }
+        }
+      ]
+    }
+  ]
+}

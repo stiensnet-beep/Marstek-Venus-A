@@ -1,0 +1,13 @@
+/node_modules/
+/.homeybuild/
+/env.json
+npm-debug.log*
+*.log
+__pycache__/
+/dist/
+tmp_*.json
+_tmp_*
+
+# app.json wordt gegenereerd met `python tools/build_app_json.py`.
+# Het wordt wél meegeleverd in de repository, zodat de app direct met
+# `homey app install` te installeren is zonder eerst te bouwen.

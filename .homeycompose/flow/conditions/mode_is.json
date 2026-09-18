@@ -1,0 +1,36 @@
+{
+  "title": {
+    "en": "Battery mode is",
+    "nl": "Batterijmodus is"
+  },
+  "titleFormatted": {
+    "en": "Battery mode is [[mode]]",
+    "nl": "Batterijmodus is [[mode]]"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=venus_a",
+      "title": {
+        "en": "Battery",
+        "nl": "Batterij"
+      }
+    },
+    {
+      "name": "mode",
+      "type": "dropdown",
+      "title": {
+        "en": "Mode",
+        "nl": "Modus"
+      },
+      "values": [
+        { "id": "Auto", "title": { "en": "Auto (self consumption)" } },
+        { "id": "AI", "title": { "en": "AI" } },
+        { "id": "UPS", "title": { "en": "UPS (backup)" } },
+        { "id": "Manual", "title": { "en": "Manual (schedule / fixed power)" } },
+        { "id": "Passive", "title": { "en": "Passive (external control)" } }
+      ]
+    }
+  ]
+}
