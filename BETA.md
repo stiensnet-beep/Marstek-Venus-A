@@ -94,8 +94,7 @@ unstable"*). Daarom:
 ## 4. Waarom deze keuzes
 
 - **Officiële bron boven giswerk.** De implementatie volgt de *Marstek Device Open API
-  Rev 3.1* (zie [`docs/MarstekDeviceOpenApi-Rev3.1.pdf`](docs/MarstekDeviceOpenApi-Rev3.1.pdf)
-  of <https://static-eu.marstekenergy.com/ems/resource/agreement/MarstekDeviceOpenApi.pdf>).
+  Rev 3.1* (<https://static-eu.marstekenergy.com/ems/resource/agreement/MarstekDeviceOpenApi.pdf>).
   Hoofdstuk 4.2 bevestigt dat de **Venus A/D de ES-component ondersteunen**, dus dezelfde
   commando's als de Venus E.
 - **Waarom geen TCP.** De opdracht was "via TCP", maar meten op de echte batterij laat zien

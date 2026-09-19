@@ -1,6 +1,6 @@
 {
   "name": "com.stiensnet.marstek",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "BETA Homey app to control a Marstek Venus A or Venus E home battery over the local UDP API (Marstek Device Open API)",
   "main": "app.js",
   "private": true,
@@ -12,7 +12,6 @@
   "scripts": {
     "images": "node tools/generate-images.js",
     "check": "python tools/check_app.py",
-    "build-app-json": "python tools/build_app_json.py",
     "marstek": "node tools/marstek-cli.js"
   },
   "dependencies": {},

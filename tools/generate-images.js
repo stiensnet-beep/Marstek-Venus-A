@@ -3,12 +3,16 @@
 /*
  * Generates the PNG assets required by the Homey app store:
  *
- *   assets/images/small.png                          250 x 250
- *   assets/images/large.png                          500 x 500
- *   assets/images/xlarge.png                        1000 x 1000
+ *   assets/images/small.png                          250 x 175
+ *   assets/images/large.png                          500 x 350
+ *   assets/images/xlarge.png                        1000 x 700
  *   drivers/venus_a/assets/images/small.png           75 x 75
  *   drivers/venus_a/assets/images/large.png          500 x 500
  *   drivers/venus_a/assets/images/xlarge.png        1000 x 1000
+ *
+ * App-level images use Homey's 10:7 "card" aspect ratio; driver images stay
+ * square. The icon itself is drawn in a square inscribed in the canvas, so
+ * the wider app-level images just show it letterboxed on the same background.
  *
  * Usage:  node tools/generate-images.js
  */
@@ -20,12 +24,12 @@ const zlib = require('zlib');
 const APP_ROOT = path.resolve(__dirname, '..');
 
 const TARGETS = [
-  { file: 'assets/images/small.png', size: 250 },
-  { file: 'assets/images/large.png', size: 500 },
-  { file: 'assets/images/xlarge.png', size: 1000 },
-  { file: 'drivers/venus_a/assets/images/small.png', size: 75 },
-  { file: 'drivers/venus_a/assets/images/large.png', size: 500 },
-  { file: 'drivers/venus_a/assets/images/xlarge.png', size: 1000 },
+  { file: 'assets/images/small.png', width: 250, height: 175 },
+  { file: 'assets/images/large.png', width: 500, height: 350 },
+  { file: 'assets/images/xlarge.png', width: 1000, height: 700 },
+  { file: 'drivers/venus_a/assets/images/small.png', width: 75, height: 75 },
+  { file: 'drivers/venus_a/assets/images/large.png', width: 500, height: 500 },
+  { file: 'drivers/venus_a/assets/images/xlarge.png', width: 1000, height: 1000 },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -123,41 +127,53 @@ function blend(state, red, green, blue, coverage) {
   state.a = outAlpha;
 }
 
-function render(size) {
-  const rgba = Buffer.alloc(size * size * 4);
+/**
+ * Renders the icon into a `width` x `height` canvas.
+ *
+ * The background (rounded card with the brand gradient) fills the whole
+ * canvas. The battery icon itself is drawn in unit space (0..1) mapped onto
+ * a square inscribed in the canvas - centered, sized to the shorter side -
+ * so a wide app-level canvas (e.g. 250x175) simply letterboxes the same
+ * icon a square one (e.g. 75x75) would show.
+ */
+function render(width, height) {
+  const rgba = Buffer.alloc(width * height * 4);
+  const minDim = Math.min(width, height);
+  const iconOffsetX = (width - minDim) / 2;
+  const iconOffsetY = (height - minDim) / 2;
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const px = (x + 0.5) / size;
-      const py = (y + 0.5) / size;
-
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       const state = { r: 0, g: 0, b: 0, a: 0 };
 
-      // Background: rounded square with a vertical brand gradient
-      const backgroundCoverage = clamp01(0.5 - sdRoundRect(px, py, 0.5, 0.5, 0.5, 0.5, 0.24) * size);
+      // Background: rounded rect filling the whole canvas, vertical brand gradient
+      const bgPx = (x + 0.5) / width;
+      const bgPy = (y + 0.5) / height;
+      const backgroundCoverage = clamp01(0.5 - sdRoundRect(bgPx, bgPy, 0.5, 0.5, 0.5, 0.5, 0.24) * minDim);
       if (backgroundCoverage > 0) {
-        const t = py;
+        const t = bgPy;
         const red = Math.round(11 + (0 - 11) * t);
         const green = Math.round(40 + (163 - 40) * t);
         const blue = Math.round(72 + (224 - 72) * t);
         blend(state, red, green, blue, backgroundCoverage);
       }
 
-      // Battery body (outline)
+      // Icon: same SDF logic as before, mapped onto the square inscribed in the canvas
+      const px = (x - iconOffsetX + 0.5) / minDim;
+      const py = (y - iconOffsetY + 0.5) / minDim;
+
       const bodySd = sdRoundRect(px, py, 0.465, 0.5, 0.255, 0.17, 0.055);
-      blend(state, 255, 255, 255, clamp01(0.5 - (Math.abs(bodySd) - 0.021) * size));
+      blend(state, 255, 255, 255, clamp01(0.5 - (Math.abs(bodySd) - 0.021) * minDim));
 
-      // Battery terminal
       const terminalSd = sdRoundRect(px, py, 0.755, 0.5, 0.035, 0.075, 0.022);
-      blend(state, 255, 255, 255, clamp01(0.5 - terminalSd * size));
+      blend(state, 255, 255, 255, clamp01(0.5 - terminalSd * minDim));
 
-      // Charge bars
       for (const centerX of [0.32, 0.465, 0.61]) {
         const barSd = sdRoundRect(px, py, centerX, 0.5, 0.042, 0.088, 0.02);
-        blend(state, 53, 224, 138, clamp01(0.5 - barSd * size));
+        blend(state, 53, 224, 138, clamp01(0.5 - barSd * minDim));
       }
 
-      const offset = (y * size + x) * 4;
+      const offset = (y * width + x) * 4;
       rgba[offset] = Math.round(state.r);
       rgba[offset + 1] = Math.round(state.g);
       rgba[offset + 2] = Math.round(state.b);
@@ -175,16 +191,17 @@ function render(size) {
 const cache = new Map();
 
 for (const target of TARGETS) {
-  if (!cache.has(target.size)) {
-    process.stdout.write(`Rendering ${target.size}x${target.size} ... `);
-    cache.set(target.size, encodePng(target.size, target.size, render(target.size)));
+  const key = `${target.width}x${target.height}`;
+  if (!cache.has(key)) {
+    process.stdout.write(`Rendering ${key} ... `);
+    cache.set(key, encodePng(target.width, target.height, render(target.width, target.height)));
     process.stdout.write('ok\n');
   }
 
   const destination = path.join(APP_ROOT, target.file);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, cache.get(target.size));
-  console.log(`Wrote ${target.file} (${target.size}x${target.size})`);
+  fs.writeFileSync(destination, cache.get(key));
+  console.log(`Wrote ${target.file} (${key})`);
 }
 
 console.log('Klaar.');

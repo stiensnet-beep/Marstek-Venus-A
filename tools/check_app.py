@@ -6,6 +6,7 @@ Checks:
   * the required manifest and code files exist
   * the app images and driver images exist and have the required dimensions
   * image paths referenced in the compose files actually resolve
+  * the version number in package.json and .homeycompose/app.json matches
 
 Usage:
     python tools/check_app.py
@@ -15,7 +16,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import struct
+import subprocess
 import sys
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,10 +38,11 @@ REQUIRED_FILES = [
     ".homeycompose/flow/conditions/mode_is.json",
 ]
 
+# App-level images use Homey's 10:7 "card" ratio; driver images are square.
 EXPECTED_IMAGES = {
-    "assets/images/small.png": (250, 250),
-    "assets/images/large.png": (500, 500),
-    "assets/images/xlarge.png": (1000, 1000),
+    "assets/images/small.png": (250, 175),
+    "assets/images/large.png": (500, 350),
+    "assets/images/xlarge.png": (1000, 700),
     "drivers/venus_a/assets/images/small.png": (75, 75),
     "drivers/venus_a/assets/images/large.png": (500, 500),
     "drivers/venus_a/assets/images/xlarge.png": (1000, 1000),
@@ -104,6 +108,28 @@ def check_images() -> None:
                 f"verkeerde afmeting voor {relative}: {size[0]}x{size[1]}, "
                 f"verwacht {expected[0]}x{expected[1]}"
             )
+
+
+def check_version_consistency() -> None:
+    """The version lives in package.json and .homeycompose/app.json; app.json
+    is generated from the latter, so it can't drift on its own, but the first
+    two are two separate hand-edited files and nothing else catches a mismatch.
+    """
+    package_path = full("package.json")
+    compose_path = full(".homeycompose/app.json")
+    if not (os.path.isfile(package_path) and os.path.isfile(compose_path)):
+        return
+
+    with open(package_path, "r", encoding="utf-8") as handle:
+        package_version = json.load(handle).get("version")
+    with open(compose_path, "r", encoding="utf-8") as handle:
+        compose_version = json.load(handle).get("version")
+
+    if package_version != compose_version:
+        errors.append(
+            "versie komt niet overeen: package.json heeft "
+            f"'{package_version}', .homeycompose/app.json heeft '{compose_version}'"
+        )
 
 
 def check_compose_image_paths() -> None:
@@ -188,13 +214,15 @@ def check_capabilities() -> None:
             warnings.append(f"instelling '{used}' wordt niet in device.js gebruikt")
 
 
-def check_javascript_balance() -> None:
-    """Light sanity check on the .js files (Node.js is not always installed).
+def check_javascript_syntax() -> None:
+    """Syntax-check every .js file.
 
-    Verifies that braces, brackets and parentheses balance, while ignoring
-    string literals and comments.
+    Prefers `node --check`, which actually parses the file (handles regex
+    literals, template expressions, etc. correctly). Falls back to a light
+    bracket-balance scan when Node.js isn't installed, so this script keeps
+    working without it - just with a weaker check.
     """
-    pairs = {")": "(", "]": "[", "}": "{"}
+    node = shutil.which("node")
 
     for current_root, dirs, files in os.walk(APP_ROOT):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -204,71 +232,99 @@ def check_javascript_balance() -> None:
 
             path = os.path.join(current_root, name)
             relative = os.path.relpath(path, APP_ROOT).replace("\\", "/")
-            with open(path, "r", encoding="utf-8") as handle:
-                source = handle.read()
 
-            stack = []
-            index = 0
-            line = 1
-            length = len(source)
-
-            while index < length:
-                char = source[index]
-
-                if char == "\n":
-                    line += 1
-                    index += 1
-                    continue
-
-                if char == "/" and index + 1 < length and source[index + 1] == "/":
-                    while index < length and source[index] != "\n":
-                        index += 1
-                    continue
-
-                if char == "/" and index + 1 < length and source[index + 1] == "*":
-                    index += 2
-                    while index + 1 < length and not (source[index] == "*" and source[index + 1] == "/"):
-                        if source[index] == "\n":
-                            line += 1
-                        index += 1
-                    index += 2
-                    continue
-
-                if char in ('"', "'", "`"):
-                    quote = char
-                    index += 1
-                    while index < length:
-                        if source[index] == "\\":
-                            index += 2
-                            continue
-                        if source[index] == quote:
-                            index += 1
-                            break
-                        if source[index] == "\n":
-                            line += 1
-                        index += 1
-                    continue
-
-                if char in "([{":
-                    stack.append((char, line))
-                elif char in ")]}":
-                    if not stack or stack[-1][0] != pairs[char]:
-                        errors.append(f"{relative}:{line}: onverwachte '{char}'")
-                    else:
-                        stack.pop()
-
-                index += 1
-
-            if stack:
-                errors.append(
-                    f"{relative}: '{stack[-1][0]}' geopend op regel {stack[-1][1]} wordt niet gesloten"
+            if node:
+                result = subprocess.run(
+                    [node, "--check", path],
+                    capture_output=True,
+                    text=True,
+                    check=False,
                 )
+                if result.returncode != 0:
+                    detail = (result.stderr or result.stdout).strip().splitlines()
+                    errors.append(f"{relative}: syntaxfout ({detail[-1] if detail else 'onbekend'})")
+            else:
+                _check_javascript_balance(path, relative)
+
+    if not node:
+        warnings.append("Node.js niet gevonden; alleen een haakjes-balanscheck uitgevoerd op .js-bestanden")
+
+
+def _check_javascript_balance(path: str, relative: str) -> None:
+    """Fallback bracket-balance scan used when Node.js is unavailable.
+
+    Verifies that braces, brackets and parentheses balance, while ignoring
+    string literals and comments. Weaker than an actual parser (e.g. it can
+    be confused by regex literals), hence only used as a fallback.
+    """
+    pairs = {")": "(", "]": "[", "}": "{"}
+
+    with open(path, "r", encoding="utf-8") as handle:
+        source = handle.read()
+
+    stack = []
+    index = 0
+    line = 1
+    length = len(source)
+
+    while index < length:
+        char = source[index]
+
+        if char == "\n":
+            line += 1
+            index += 1
+            continue
+
+        if char == "/" and index + 1 < length and source[index + 1] == "/":
+            while index < length and source[index] != "\n":
+                index += 1
+            continue
+
+        if char == "/" and index + 1 < length and source[index + 1] == "*":
+            index += 2
+            while index + 1 < length and not (source[index] == "*" and source[index + 1] == "/"):
+                if source[index] == "\n":
+                    line += 1
+                index += 1
+            index += 2
+            continue
+
+        if char in ('"', "'", "`"):
+            quote = char
+            index += 1
+            while index < length:
+                if source[index] == "\\":
+                    index += 2
+                    continue
+                if source[index] == quote:
+                    index += 1
+                    break
+                if source[index] == "\n":
+                    line += 1
+                index += 1
+            continue
+
+        if char in "([{":
+            stack.append((char, line))
+        elif char in ")]}":
+            if not stack or stack[-1][0] != pairs[char]:
+                errors.append(f"{relative}:{line}: onverwachte '{char}'")
+            else:
+                stack.pop()
+
+        index += 1
+
+    if stack:
+        errors.append(
+            f"{relative}: '{stack[-1][0]}' geopend op regel {stack[-1][1]} wordt niet gesloten"
+        )
 
 
 def main() -> int:
     check_json_files()
-    check_javascript_balance()
+    check_javascript_syntax()
     check_required_files()
+    check_version_consistency()
     check_images()
     check_compose_image_paths()
     check_flow_cards()

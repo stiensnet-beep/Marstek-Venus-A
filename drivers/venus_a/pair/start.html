@@ -99,11 +99,17 @@
 
         devices.forEach(function (device, index) {
           var settings = device.settings || {};
-          var detail = settings.host ? ('IP ' + settings.host + (settings.port ? ' &middot; poort ' + settings.port : '')) : 'handmatig instellen';
+          var detail = settings.host ? ('IP ' + settings.host + (settings.port ? ' · poort ' + settings.port : '')) : 'handmatig instellen';
 
+          // device.name komt uit een UDP-broadcast op het netwerk: via
+          // textContent ipv innerHTML zetten, zodat een geknutseld apparaat
+          // geen HTML in dit scherm kan injecteren.
           var button = document.createElement('button');
           button.className = 'device';
-          button.innerHTML = device.name + '<small>' + detail + '</small>';
+          button.textContent = device.name;
+          var detailEl = document.createElement('small');
+          detailEl.textContent = detail;
+          button.appendChild(detailEl);
           button.addEventListener('click', function () {
             selectedIndex = index;
             Array.prototype.forEach.call(document.querySelectorAll('.device'), function (element) {

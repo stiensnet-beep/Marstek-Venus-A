@@ -5,6 +5,14 @@ const { MarstekClient, parseStatus, normalizeMode, DEFAULT_PORT } = require('../
 
 const MAX_FAILURES = 3;
 
+/**
+ * Default max age (ms) for the cached mode used by the `mode_is` condition
+ * card. The regular poll (>= 60s, see driver.compose.json) keeps this cache
+ * fresh, so a condition check normally doesn't need its own UDP round-trip -
+ * that would double the traffic these batteries are sensitive to.
+ */
+const DEFAULT_MODE_MAX_AGE = 45 * 1000;
+
 module.exports = class VenusADevice extends Homey.Device {
 
   async onInit() {
@@ -15,6 +23,7 @@ module.exports = class VenusADevice extends Homey.Device {
     this._failures = 0;
     this._available = true;
     this._mode = this.getStoreValue('mode') || null;
+    this._modeUpdatedAt = 0;
 
     this._modeChangedTrigger = this.homey.flow.getDeviceTriggerCard('mode_changed');
 
@@ -34,12 +43,19 @@ module.exports = class VenusADevice extends Homey.Device {
     if (changedKeys.includes('host') || changedKeys.includes('port')) {
       this._client = null;
     }
-    if (changedKeys.includes('poll_interval')
-      || changedKeys.includes('host')
-      || changedKeys.includes('port')) {
-      this._startPolling();
-    }
-    this._sync().catch((err) => this._onFailure(err));
+
+    // De nieuwe waarden staan tijdens deze callback nog niet in
+    // this.getSettings() (SDK3-gedrag), dus _startPolling()/_sync() zouden
+    // hier de oude host/poort/interval te pakken krijgen. Met setTimeout(0)
+    // draaien ze pas nadat Homey de nieuwe instellingen heeft opgeslagen.
+    this.homey.setTimeout(() => {
+      if (changedKeys.includes('poll_interval')
+        || changedKeys.includes('host')
+        || changedKeys.includes('port')) {
+        this._startPolling();
+      }
+      this._sync().catch((err) => this._onFailure(err));
+    }, 0);
   }
 
   async onDeleted() {
@@ -54,8 +70,22 @@ module.exports = class VenusADevice extends Homey.Device {
    * Public API (used by flow cards)
    * ---------------------------------------------------------------- */
 
-  /** Read the current mode from the battery (falls back to the cached value). */
-  async getCurrentMode() {
+  /**
+   * Read the current mode, used by the `mode_is` condition card.
+   *
+   * The regular poll (_sync) already keeps `this._mode` fresh, so as long as
+   * that cache isn't older than `maxAge` it is returned directly instead of
+   * doing another UDP round-trip - that would double the network traffic on
+   * a flow that checks the condition every minute.
+   *
+   * @param {object} [options]
+   * @param {number} [options.maxAge] Max cache age in ms (default 45s).
+   */
+  async getCurrentMode({ maxAge = DEFAULT_MODE_MAX_AGE } = {}) {
+    if (this._mode && Date.now() - this._modeUpdatedAt < maxAge) {
+      return this._mode;
+    }
+
     try {
       const mode = await this._getClient().getMode();
       if (mode) await this._applyMode(mode);
@@ -86,13 +116,18 @@ module.exports = class VenusADevice extends Homey.Device {
     const { setResult } = await client.setMode(mode, {
       power: settings.manualPower,
       // De UDP-server van de batterij is wisselvallig: schrijfcommando's krijgen
-      // meer geduld dan de periodieke uitlezing.
-      attempts: 5,
-      retryDelay: 2000,
+      // iets meer geduld dan de periodieke uitlezing. De back-off is aan de
+      // client-kant geplafonneerd (MAX_RETRY_DELAY), zodat dit plus de
+      // terugleescontrole hieronder ruim binnen Homey's 30s flow-timeout blijft.
+      attempts: 3,
+      retryDelay: 1500,
       ...options,
     });
 
     // `set_result` is not a reliable success indicator, so read the mode back.
+    // Een korte pauze eerst voorkomt valse mismatches: de batterij past de
+    // modus soms pas net na het antwoord op ES.SetMode toe.
+    await new Promise((resolve) => this.homey.setTimeout(resolve, 750));
     const actualMode = await client.getMode();
     await this._applyMode(actualMode);
     this._onSuccess();
@@ -211,6 +246,7 @@ module.exports = class VenusADevice extends Homey.Device {
 
     const changed = this._mode !== mode;
     this._mode = mode;
+    this._modeUpdatedAt = Date.now();
 
     if (changed) {
       await this.setStoreValue('mode', mode).catch((err) => this.log(err.message));

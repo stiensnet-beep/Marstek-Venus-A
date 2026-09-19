@@ -1,0 +1,6 @@
+{
+  "0.1.1": {
+    "en": "Fixed a broken app.json build script, a settings bug where a new poll interval or IP address only took effect after restarting the app, and a battery percentage that could get stuck at 100%. Also capped retry timing so flow cards can no longer time out, reduced network traffic from the mode condition card, and cleaned up the pairing screen and build tooling.",
+    "nl": "Kapot app.json-bouwscript verwijderd, een instellingenbug opgelost waarbij een nieuw poll-interval of IP-adres pas na herstart werkte, en een batterijpercentage dat kon vastlopen op 100%. Ook de retry-timing beperkt zodat flowkaarten niet meer kunnen timeouten, netwerkverkeer van de moduscheck verminderd, en het koppelscherm en de buildtools opgeschoond."
+  }
+}

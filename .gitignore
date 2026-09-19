@@ -8,6 +8,7 @@ __pycache__/
 tmp_*.json
 _tmp_*
 
-# app.json wordt gegenereerd met `python tools/build_app_json.py`.
-# Het wordt wél meegeleverd in de repository, zodat de app direct met
-# `homey app install` te installeren is zonder eerst te bouwen.
+# app.json wordt gegenereerd door de Homey CLI (`homey app build` /
+# `homey app install`) op basis van .homeycompose/*. Het wordt wél meegeleverd
+# in de repository, zodat de app direct te installeren is zonder eerst te
+# bouwen.

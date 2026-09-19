@@ -55,7 +55,7 @@ pogingen en herstelt hij zichzelf. Gebruik op eigen risico. Alle details, de get
 hardware, de risico's en een uitgebreide handleiding staan in `BETA.md` in de repo.
 
 **Bronnen**
-- Officiele Marstek Device Open API Rev 3.1: zie de link in de repo (`docs/`)
+- Officiele Marstek Device Open API Rev 3.1: https://static-eu.marstekenergy.com/ems/resource/agreement/MarstekDeviceOpenApi.pdf
 - Repo: https://github.com/stiensnet-beep/Marstek-Venus-A
 - Bugs of ideeen? Zet ze in een issue in de repo.
 
