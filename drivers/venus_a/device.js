@@ -6,6 +6,14 @@ const { MarstekClient, parseStatus, normalizeMode, DEFAULT_PORT } = require('../
 const MAX_FAILURES = 3;
 
 /**
+ * De energietellers (ES.GetStatus) en de temperatuur (Bat.GetStatus) zitten in
+ * andere componenten dan ES.GetMode, dus dat zijn twee extra UDP-verzoeken.
+ * De UDP-server van deze batterijen houdt niet van veel verkeer, daarom wordt
+ * dit maar één op de zoveel rondes opgehaald (bij 60 s pollen: elke 5 minuten).
+ */
+const ENERGY_EVERY = 5;
+
+/**
  * Default max age (ms) for the cached mode used by the `mode_is` condition
  * card. The regular poll (>= 60s, see driver.compose.json) keeps this cache
  * fresh, so a condition check normally doesn't need its own UDP round-trip -
@@ -24,6 +32,7 @@ module.exports = class VenusADevice extends Homey.Device {
     this._available = true;
     this._mode = this.getStoreValue('mode') || null;
     this._modeUpdatedAt = 0;
+    this._pollCount = 0;
 
     this._modeChangedTrigger = this.homey.flow.getDeviceTriggerCard('mode_changed');
 
@@ -35,8 +44,39 @@ module.exports = class VenusADevice extends Homey.Device {
 
     await this._ensureCapabilities();
 
+    await this._migrateClass();
+
     this._startPolling();
     this._sync().catch((err) => this._onFailure(err));
+  }
+
+  /**
+   * Zorg dat het apparaat de klasse heeft die de driver voorschrijft.
+   *
+   * Homey legt de klasse van een apparaat vast op het moment van koppelen: een
+   * update van de app verandert de klasse van een bestaand apparaat niet, en via
+   * de API is `class` niet te wijzigen (`PUT /device/:id` negeert het veld).
+   * Zonder deze migratie blijft een koppeling die met een oudere app-versie is
+   * gemaakt op `socket` staan en komt de batterij nooit in het energieoverzicht,
+   * want daar is klasse `battery` voor nodig.
+   */
+  async _migrateClass() {
+    const target = 'battery';
+
+    if (typeof this.getClass !== 'function' || typeof this.setClass !== 'function') {
+      this.log('Klasse-API niet beschikbaar op deze Homey-versie; migratie overgeslagen');
+      return;
+    }
+
+    try {
+      const current = this.getClass();
+      if (current === target) return;
+
+      await this.setClass(target);
+      this.log(`Klasse bijgewerkt van "${current}" naar "${target}" (nodig voor het energieoverzicht)`);
+    } catch (err) {
+      this.error('Klasse bijwerken mislukt:', (err && err.message) || err);
+    }
   }
 
   async onSettings({ changedKeys }) {
@@ -163,7 +203,15 @@ module.exports = class VenusADevice extends Homey.Device {
    * ---------------------------------------------------------------- */
 
   async _ensureCapabilities() {
-    for (const capability of ['measure_battery', 'measure_power']) {
+    const capabilities = [
+      'measure_battery',
+      'measure_power',
+      'meter_power.charged',
+      'meter_power.discharged',
+      'measure_temperature',
+    ];
+
+    for (const capability of capabilities) {
       if (this.hasCapability(capability)) continue;
       try {
         await this.addCapability(capability);
@@ -238,7 +286,35 @@ module.exports = class VenusADevice extends Homey.Device {
     }
 
     await this._applyStatus(status);
+
+    // Energie en temperatuur: één keer meteen, daarna af en toe (zie ENERGY_EVERY).
+    this._pollCount += 1;
+    if (this._pollCount === 1 || this._pollCount % ENERGY_EVERY === 0) {
+      await this._syncEnergy(client);
+    }
+
     this._onSuccess();
+  }
+
+  /**
+   * De energietellers en de temperatuur ophalen. Deze zitten in ES.GetStatus en
+   * Bat.GetStatus; ES.GetMode (de gewone poll) bevat ze niet.
+   *
+   * @param {MarstekClient} client
+   */
+  async _syncEnergy(client) {
+    const [status, batterij] = await Promise.all([
+      client.getStatus().catch((err) => {
+        this.log('ES.GetStatus mislukt:', err.message);
+        return null;
+      }),
+      client.getBatteryStatus().catch((err) => {
+        this.log('Bat.GetStatus mislukt:', err.message);
+        return null;
+      }),
+    ]);
+
+    await this._applyEnergy(parseStatus(status), parseStatus(batterij));
   }
 
   async _applyMode(mode) {
@@ -278,6 +354,32 @@ module.exports = class VenusADevice extends Homey.Device {
     if (status.power !== null && status.power !== undefined && Number.isFinite(status.power)) {
       if (this.getCapabilityValue('measure_power') !== status.power) {
         await this.setCapabilityValue('measure_power', status.power);
+      }
+    }
+  }
+
+  /**
+   * De energietellers (kWh, cumulatief) en de batterijtemperatuur doorgeven aan
+   * Homey. De tellers zijn wat het Energie-overzicht van Homey gebruikt voor een
+   * thuisbatterij; zonder `energy.homeBattery` + deze twee capaciteiten komt het
+   * apparaat daar niet in voor.
+   *
+   * @param {object} status  parseStatus(ES.GetStatus)
+   * @param {object} batterij parseStatus(Bat.GetStatus)
+   */
+  async _applyEnergy(status, batterij) {
+    const waarden = [
+      ['meter_power.charged', status && status.chargedKwh, 100],
+      ['meter_power.discharged', status && status.dischargedKwh, 100],
+      ['measure_temperature', batterij && batterij.temperature, 10],
+    ];
+
+    for (const [capability, waarde, factor] of waarden) {
+      if (!Number.isFinite(waarde) || !this.hasCapability(capability)) continue;
+
+      const afgerond = Math.round(waarde * factor) / factor;
+      if (this.getCapabilityValue(capability) !== afgerond) {
+        await this.setCapabilityValue(capability, afgerond);
       }
     }
   }

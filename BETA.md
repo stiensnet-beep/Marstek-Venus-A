@@ -1,6 +1,6 @@
 # Marstek Venus voor Homey — **BETA**
 
-**Gemaakt door JPD** · versie `0.1.0` (BETA 1) · Homey SDK 3 (lokaal)
+**Gemaakt door JPD** · versie `0.2.0` (BETA 2) · Homey SDK 3 (lokaal)
 
 > Homey staat geen pre-release versienummers toe (`0.1.0-beta.1` werd door de validator
 > geweigerd). In het app-manifest staat daarom `0.1.0`; de BETA-status blijkt uit de
@@ -10,6 +10,12 @@
 > breed uitgerold. Gebruik hem op eigen verantwoordelijkheid: je stuurt een echte
 > thuisbatterij aan. Zie ook de sectie *Risico's* onderaan.
 
+> **Upgraden van 0.1.x naar 0.2.0?** Homey legt de klasse van een apparaat vast bij het
+> koppelen; een bestaand apparaat blijft dus `socket` staan en komt niet in het
+> energieoverzicht. Verwijder het apparaat in de Homey-app en voeg het opnieuw toe - zie
+> [`README.md` § Energieoverzicht](README.md#energieoverzicht-energy-tab). Koppel je 0.2.0
+> voor het eerst, dan gaat het automatisch goed.
+
 ---
 
 ## 1. Wat "BETA" hier precies betekent
@@ -17,7 +23,7 @@
 | Wel | Nog niet |
 |---|---|
 | Getest en werkend op een **Venus E 3.0** (fw 150) en een **Venus A** (fw 148) | Getest op de Venus C, D, E mini en Jupiter — de API-documentatie noemt ze, maar we hebben ze niet in handen gehad |
-| Uitlezen van modus, SOC, vermogen + aan/uit schakelen vanuit Homey-flows | Energietotalen (kWh), PV-ingangen en DOD-instellingen |
+| Uitlezen van modus, SOC, vermogen, temperatuur en kWh-tellers + aan/uit schakelen vanuit Homey-flows | PV-ingangen, DOD-instellingen en sturen op een doelvermogen |
 | Werkt naast de bestaande Venus E-app | Garantie op werking na een firmware-update van Marstek |
 | Fouten worden duidelijk gemeld en de app herstelt zichzelf | Ondersteuning van Marstek zelf (het is geen officiële integratie) |
 
@@ -288,8 +294,12 @@ Uitgebreide uitleg over de ontwikkeling, netwerkdiagnose en alle metingen:
   kloppen. Zonder dat antwoordt de batterij nergens op (de app zal dan *onbeschikbaar* zijn).
 - **Eén batterij-index**: de app gebruikt `params.id = 0`. Meerdere batterijen in één
   systeem (multi-instance) zijn nog niet ondersteund.
-- **Geen energiemeters**: kWh-totalen, PV-status en DOD zijn (nog) niet als Homey-capaciteit
-  ontsloten; ze zijn wel op te vragen via de CLI.
+- **Energietellers sinds 0.2.0 wél ontsloten**: `meter_power.charged` en
+  `meter_power.discharged` (uit `ES.GetStatus`) plus de batterijtemperatuur
+  (`Bat.GetStatus`). Daarmee staat de batterij in het energieoverzicht van Homey.
+  **Nog niet ontsloten**: de PV-ingangen, de CT-/fasegegevens van het huis, het nog
+  beschikbare vermogen in Wh (`bat_capacity`) en de DOD-instelling; die zijn wel via de
+  CLI op te vragen (zie `README.md`).
 - **"Uit" is geen fysieke uitschakeling**: de batterij blijft aan, maar doet niets.
 - **Firmware-afhankelijk**: Marstek kan velden of modi wijzigen; de protocol-laag staat
   daarom in één bestand ([`lib/marstek.js`](lib/marstek.js)).

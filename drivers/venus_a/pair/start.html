@@ -1,87 +1,175 @@
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <script type="text/javascript" src="/homey.js" data-origin="pair"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 20px 16px 120px;
-      background: #ffffff;
-      color: #1f2937;
-      -webkit-text-size-adjust: 100%;
-    }
-    h1 { font-size: 22px; margin: 0 0 6px; }
-    p { font-size: 15px; line-height: 1.4; color: #4b5563; margin: 0 0 18px; }
-    .device {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 16px;
-      margin-bottom: 12px;
-      border: 3px solid #d1d5db;
-      border-radius: 12px;
-      background: #f9fafb;
-      font-size: 17px;
-      font-weight: 600;
-      color: #111827;
-      cursor: pointer;
-    }
-    .device.selected { border-color: #00A3E0; background: #e8f6fd; }
-    .device small { display: block; font-size: 14px; font-weight: 400; color: #6b7280; margin-top: 6px; }
-    #status { font-size: 15px; color: #374151; min-height: 22px; }
-    #status.error { color: #b91c1c; }
-    footer {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 12px 16px 24px;
-      background: #ffffff;
-      border-top: 1px solid #e5e7eb;
-    }
-    button.primary {
-      width: 100%;
-      padding: 16px;
-      font-size: 18px;
-      font-weight: 600;
-      border: none;
-      border-radius: 12px;
-      background: #00A3E0;
-      color: #ffffff;
-    }
-    button.primary:disabled { background: #bfdcea; }
-  </style>
-</head>
-<body>
-  <h1>Marstek batterij kiezen</h1>
-  <p>Kies hieronder de batterij die je wilt toevoegen. Venus A en Venus E werken met dezelfde app; controleer het IP-adres.</p>
+<!--
+  Koppelscherm (pair view) van de Marstek Venus-app.
 
-  <div id="list"></div>
-  <div id="status">Zoeken op het netwerk&hellip;</div>
+  Dit is bewust een FRAGMENT: geen <html>, <head> of <body> en geen
+  <script src="/homey.js">. De Homey-app (Sky) plaatst dit scherm in zijn eigen
+  venster en levert het Homey-object zelf - net als bij de apps van Athom.
 
-  <footer>
-    <button id="next" class="primary" disabled>Volgende</button>
-  </footer>
+  Waarom niet het klassieke recept met
+  <script src="/homey.js" data-origin="pair"></script>:
+  dat script haalt vervolgens /js/homey.pair.js op. Op Homey-firmware 13.5.1
+  bestaat dat bestand niet (HTTP 404, ook met API-token en ook via http), dus
+  koppelen stopt met "Could not load script: /js/homey.pair.js". Zonder die
+  include laadt Sky het scherm zelf en werkt het koppelen wel.
 
-  <script type="text/javascript">
+  Alle klassen beginnen met `nhd-`, zodat de opmaak niet botst met die van Sky.
+-->
+<style>
+  .nhd-pair {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 8px 4px 96px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1f2937;
+    -webkit-text-size-adjust: 100%;
+  }
+  .nhd-pair__title { font-size: 22px; margin: 0 0 6px; }
+  .nhd-pair__intro { font-size: 15px; line-height: 1.4; color: #4b5563; margin: 0 0 18px; }
+  .nhd-pair__device {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 3px solid #d1d5db;
+    border-radius: 12px;
+    background: #f9fafb;
+    font-size: 17px;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+  }
+  .nhd-pair__device--selected { border-color: #00a3e0; background: #e8f6fd; }
+  .nhd-pair__detail { display: block; font-size: 14px; font-weight: 400; color: #6b7280; margin-top: 6px; }
+  .nhd-pair__status { font-size: 15px; color: #374151; min-height: 22px; margin-top: 4px; }
+  .nhd-pair__status--error { color: #b91c1c; }
+  .nhd-pair__footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px 16px 24px;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid #e5e7eb;
+  }
+  .nhd-pair__button {
+    width: 100%;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    background: #00a3e0;
+    color: #ffffff;
+  }
+  .nhd-pair__button:disabled { background: #bfdcea; }
+</style>
+
+<div class="nhd-pair">
+  <h1 class="nhd-pair__title">Marstek batterij kiezen</h1>
+  <p class="nhd-pair__intro">Kies hieronder de batterij die je wilt toevoegen. Venus A en Venus E werken met dezelfde app; controleer het IP-adres.</p>
+
+  <div id="nhd-pair-list"></div>
+  <div id="nhd-pair-status" class="nhd-pair__status">Zoeken op het netwerk&hellip;</div>
+
+  <div class="nhd-pair__footer">
+    <button id="nhd-pair-next" class="nhd-pair__button" disabled>Volgende</button>
+  </div>
+</div>
+
+<script type="text/javascript">
+  (function () {
+    'use strict';
+
     var devices = [];
     var selectedIndex = -1;
 
-    function setStatus(text, isError) {
-      var el = document.getElementById('status');
-      el.innerHTML = text;
-      el.className = isError ? 'error' : '';
+    function el(id) {
+      return document.getElementById(id);
     }
 
-    function onHomeyReady(Homey) {
-      Homey.ready();
+    function setStatus(text, isError) {
+      var status = el('nhd-pair-status');
+      if (!status) return;
+      status.textContent = text;
+      status.className = isError ? 'nhd-pair__status nhd-pair__status--error' : 'nhd-pair__status';
+    }
 
-      var listEl = document.getElementById('list');
-      var nextEl = document.getElementById('next');
+    /*
+     * Apparaat toevoegen. Homey.createDevice() is de gebruikelijke weg; als die
+     * niet bestaat (oudere host) valt dit terug op het emit-equivalent.
+     */
+    function createDevice(Homey, device) {
+      if (typeof Homey.createDevice === 'function') {
+        return Homey.createDevice(device);
+      }
+
+      return new Promise(function (resolve, reject) {
+        Homey.emit('create_device', device, function (error, result) {
+          if (error) reject(error);
+          else resolve(result);
+        });
+      });
+    }
+
+    function done(Homey) {
+      if (typeof Homey.done === 'function') return Homey.done();
+      if (typeof Homey.emit === 'function') Homey.emit('done');
+      return undefined;
+    }
+
+    function renderDevices() {
+      var listEl = el('nhd-pair-list');
+      var nextEl = el('nhd-pair-next');
+      if (!listEl || !nextEl) return;
+
+      listEl.innerHTML = '';
+
+      devices.forEach(function (device, index) {
+        var settings = device.settings || {};
+        var detail = settings.host
+          ? ('IP ' + settings.host + (settings.port ? ' \u00b7 poort ' + settings.port : ''))
+          : 'handmatig instellen';
+
+        // device.name komt uit een UDP-broadcast op het netwerk: via
+        // textContent ipv innerHTML zetten, zodat een geknutseld apparaat
+        // geen HTML in dit scherm kan injecteren.
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'nhd-pair__device';
+        button.textContent = device.name;
+
+        var detailEl = document.createElement('span');
+        detailEl.className = 'nhd-pair__detail';
+        detailEl.textContent = detail;
+        button.appendChild(detailEl);
+
+        button.addEventListener('click', function () {
+          selectedIndex = index;
+          Array.prototype.forEach.call(listEl.getElementsByTagName('button'), function (element) {
+            element.className = 'nhd-pair__device';
+          });
+          button.className = 'nhd-pair__device nhd-pair__device--selected';
+          nextEl.disabled = false;
+        });
+
+        listEl.appendChild(button);
+      });
+    }
+
+    function start(Homey) {
+      if (!Homey) {
+        setStatus('Koppelen kan niet starten: de Homey-app gaf geen koppel-API mee.', true);
+        return;
+      }
+
+      try {
+        if (typeof Homey.setTitle === 'function') Homey.setTitle('Marstek Venus');
+      } catch (err) { /* titel is optioneel */ }
+
+      try {
+        if (typeof Homey.ready === 'function') Homey.ready();
+      } catch (err) { /* ready is optioneel */ }
 
       Homey.emit('list_devices', null, function (error, result) {
         if (error) {
@@ -90,56 +178,46 @@
         }
 
         devices = result || [];
-        listEl.innerHTML = '';
+        renderDevices();
 
         if (!devices.length) {
           setStatus('Geen apparaten gevonden. Controleer of de batterij op hetzelfde netwerk zit.', true);
           return;
         }
 
-        devices.forEach(function (device, index) {
-          var settings = device.settings || {};
-          var detail = settings.host ? ('IP ' + settings.host + (settings.port ? ' · poort ' + settings.port : '')) : 'handmatig instellen';
-
-          // device.name komt uit een UDP-broadcast op het netwerk: via
-          // textContent ipv innerHTML zetten, zodat een geknutseld apparaat
-          // geen HTML in dit scherm kan injecteren.
-          var button = document.createElement('button');
-          button.className = 'device';
-          button.textContent = device.name;
-          var detailEl = document.createElement('small');
-          detailEl.textContent = detail;
-          button.appendChild(detailEl);
-          button.addEventListener('click', function () {
-            selectedIndex = index;
-            Array.prototype.forEach.call(document.querySelectorAll('.device'), function (element) {
-              element.className = 'device';
-            });
-            button.className = 'device selected';
-            nextEl.disabled = false;
-          });
-          listEl.appendChild(button);
-        });
-
         setStatus(devices.length + ' apparaat/apparaten gevonden.');
       });
 
-      nextEl.addEventListener('click', function () {
-        if (selectedIndex < 0) return;
+      var nextEl = el('nhd-pair-next');
+      if (nextEl) {
+        nextEl.addEventListener('click', function () {
+          if (selectedIndex < 0) return;
 
-        var device = devices[selectedIndex];
-        nextEl.disabled = true;
-        setStatus('Bezig met toevoegen&hellip;');
+          var device = devices[selectedIndex];
+          nextEl.disabled = true;
+          setStatus('Bezig met toevoegen\u2026');
 
-        Homey.createDevice(device).then(function () {
-          setStatus('Toegevoegd.');
-          Homey.done();
-        }).catch(function (error) {
-          setStatus('Toevoegen mislukt: ' + (error.message || error), true);
-          nextEl.disabled = false;
+          createDevice(Homey, device)
+            .then(function () {
+              setStatus('Toegevoegd.');
+              return done(Homey);
+            })
+            .catch(function (error) {
+              setStatus('Toevoegen mislukt: ' + ((error && error.message) || error), true);
+              nextEl.disabled = false;
+            });
         });
-      });
+      }
     }
-  </script>
-</body>
-</html>
+
+    // Sky roept dit aan zodra het Homey-object klaarstaat.
+    window.onHomeyReady = start;
+
+    // Sommige hosts zetten Homey al klaar voordat dit script loopt.
+    if (typeof window.Homey !== 'undefined' && window.Homey) {
+      start(window.Homey);
+    } else {
+      setStatus('Zoeken op het netwerk\u2026');
+    }
+  })();
+</script>

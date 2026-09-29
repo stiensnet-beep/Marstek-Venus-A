@@ -1,8 +1,8 @@
 {
   "id": "com.stiensnet.marstek",
-  "version": "0.1.1",
+  "version": "0.2.2",
   "sdk": 3,
-  "compatibility": ">=5.0.0",
+  "compatibility": ">=12.0.0",
   "platforms": [
     "local"
   ],

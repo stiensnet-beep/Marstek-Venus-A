@@ -1,6 +1,6 @@
 # Marstek Venus — Homey app (**BETA**)
 
-**Gemaakt door JPD** · versie `0.1.0` (BETA 1) · Homey SDK 3 (lokaal)
+**Gemaakt door JPD** · versie `0.2.0` (BETA 2) · Homey SDK 3 (lokaal)
 
 > **BETA:** de app werkt en is getest op een **Venus E 3.0 (fw 150)** en een **Venus A
 > (fw 148)**, maar is nog niet breed uitgerold en is geen officiele Marstek-integratie.
@@ -31,8 +31,9 @@ voer `homey app install` uit in die map.
 
 Volledige stap-voor-stap handleiding: [`BETA.md` §5](BETA.md).
 
-Naast aan/uit worden ook de **batterijmodus**, het **laadniveau (SOC)** en het
-**batterijvermogen** uitgelezen (optioneel, instelbaar poll-interval).
+Naast aan/uit worden ook de **batterijmodus**, het **laadniveau (SOC)**, het
+**batterijvermogen**, de **batterijtemperatuur** en de **kWh-tellers** (geladen en
+ontladen) uitgelezen (optioneel, instelbaar poll-interval).
 
 De Venus E kun je met de bestaande Marstek-app blijven bedienen; deze app voegt
 daar niets aan toe en kan naast die app bestaan.
@@ -42,7 +43,9 @@ daar niets aan toe en kan naast die app bestaan.
 ## 1. Wat kun je ermee in Homey?
 
 **Apparaten**
-- Marstek Venus A (driver `venus_a`) met de capaciteiten `onoff`, `measure_battery`, `measure_power`.
+- Marstek Venus A (driver `venus_a`), klasse **battery** (thuisbatterij), met de capaciteiten
+  `onoff`, `measure_battery`, `measure_power`, `meter_power.charged`,
+  `meter_power.discharged` en `measure_temperature`.
 
 **Flows — acties (ingebouwd via de `onoff`-capaciteit)**
 - *Zet aan* (schakelt naar de in de instellingen gekozen "aan"-modus, standaard `Auto` met `auto_cfg.enable = 1`)
@@ -60,15 +63,61 @@ daar niets aan toe en kan naast die app bestaan.
 **Flows — trigger**
 - *Batterijmodus is gewijzigd* met token `mode` (de nieuwe modus).
 
+### Energieoverzicht (Energy-tab)
+
+Homey zet een thuisbatterij alleen in het energieoverzicht als de driver dat expliciet
+zegt: `"energy": { "homeBattery": true }` in `driver.compose.json`, plus de tellers
+`meter_power.charged` en `meter_power.discharged` (kWh). Tot **0.1.1** deed deze app dat
+niet, waardoor de batterij nergens in het energieoverzicht stond - ook niet met
+"Uitsluiten van energie" op **NEE**. Sinds **0.2.0** wel:
+
+| Waarde | Homey-capaciteit | Waar het vandaan komt |
+|---|---|---|
+| Batterijniveau (%) | `measure_battery` | `ES.GetMode` / `Bat.GetStatus` (`bat_soc`) |
+| Batterijvermogen (W, negatief = ontladen) | `measure_power` | `ES.GetMode` (`ongrid_power`) |
+| Geladen energie (kWh, cumulatief) | `meter_power.charged` | `ES.GetStatus` (`total_grid_input_energy`) |
+| Ontladen energie (kWh, cumulatief) | `meter_power.discharged` | `ES.GetStatus` (`total_grid_output_energy`) |
+| Batterijtemperatuur (°C) | `measure_temperature` | `Bat.GetStatus` (`bat_temp`) |
+
+De twee energietellers worden niet bij elke poll opgehaald: dat kost twee extra
+UDP-verzoeken en deze batterijen houden niet van veel verkeer. Ze komen één keer bij het
+starten en daarna elke vijfde ronde - bij het standaardinterval van 60 s dus elke 5
+minuten. De temperatuur lift mee op dezelfde ronde.
+
+> Let op: `ES.GetMode` bevat ook `input_energy` / `output_energy` (in 0,1 Wh), maar dat
+> zijn de **CT-waarden van het huis** (import/export van de meterkast), niet de lading van
+> de batterij. Die worden daarom bewust niet als batterijteller gebruikt.
+
+### Al gekoppeld? Eenmalig opnieuw toevoegen
+
+Homey legt de **klasse van een apparaat vast op het moment van koppelen**. Had je de
+batterij al in Homey voordat je 0.2.0 installeerde, dan blijft hij op de oude klasse
+(`socket`) staan - ook na een app-update of een herstart van de app. Je ziet dan wél de
+nieuwe waarden (temperatuur en kWh-tellers), maar de batterij komt **niet** in het
+energieoverzicht.
+
+Eenmalige oplossing:
+
+1. Homey-app → **Apparaten** → **Schuur accu** (of jouw naam) → **tandwiel** → **Verwijderen**.
+2. **+** → **Marstek Venus** → **Marstek Venus A** → kies de regel met het IP-adres van je
+   Venus A (`192.168.1.118`).
+3. Klaar: het apparaat heeft nu klasse `battery` en staat in **Energie → Thuisbatterij**.
+
+> Met de API is dit niet te repareren: `homey api devices update-device` negeert `class`
+> (gecontroleerd op firmware 13.5.1) en ook een herstart van de app verandert de klasse
+> niet. Alleen opnieuw koppelen werkt.
+
 ---
 
 ## 2. Vereisten
 
-- Homey Pro (getest op Homey Pro 2023, firmware 10+), app draait **lokaal** op Homey.
-- Node.js 18+ en de Homey CLI op je computer om de app te installeren/bouwen.
-  > Node.js is op deze computer nog niet geïnstalleerd (`node` staat niet in het PATH).
-  > Installeer het met `winget install OpenJS.NodeJS.LTS` of via <https://nodejs.org>,
-  > daarna `npm install -g athom-cli`.
+- Homey Pro met firmware **12 of nieuwer** (getest op 13.5.1), app draait **lokaal** op
+  Homey. Sinds 0.2.0 is Homey 12 het minimum: de klasse `battery` (thuisbatterij) die
+  nodig is voor het energieoverzicht bestaat niet in oudere firmware.
+- Node.js 18+ en de Homey CLI op je computer om de app te installeren/bouwen
+  (op deze computer: Node.js **v24** met Homey CLI **4.5.0**). Ontbreekt Node.js?
+  Installeer het met `winget install OpenJS.NodeJS.LTS` of via <https://nodejs.org>,
+  daarna `npm install -g homey`.
 - De Venus A moet bereikbaar zijn op je LAN (zelfde netwerk als je Homey).
 - De lokale API moet op de batterij aanwezig zijn (recente firmware).
 - Python 3 is hier wél aanwezig; de hulpscripts voor iconen/controle werken daarmee.
@@ -272,6 +321,43 @@ Bij `Manual` wordt extra configuratie meegestuurd:
   "manual_cfg":{"time_num":0,"start_time":"00:00","end_time":"23:59","power":800,"enable":1}
 }}}
 ```
+
+### Wat de API nog meer geeft
+
+Alles hieronder komt uit de officiële *Marstek Device Open API Rev 3.1*. De kolom
+"Venus A nu" is wat de batterij op **29-09-2026** teruggaf (fw 148, 192.168.1.118),
+opgevraagd met `node tools/marstek-cli.js`; de laatste kolom zegt of de app het gebruikt.
+
+| Commando | Gegeven | Venus A nu | In de app? |
+|---|---|---|---|
+| `Marstek.GetDevice` | model, firmware, BLE-MAC, WiFi-MAC, WiFi-naam, IP | `Venus A`, fw 148, `192.168.1.118` | deels (koppelen) |
+| `ES.GetMode` | `mode`, `bat_soc`, `ongrid_power`, `offgrid_power` | `Auto`, 15 %, −133 W | ja (elke poll) |
+| `ES.GetMode` | `ct_state` + `a_power`/`b_power`/`c_power`/`total_power` (CT per fase) | CT aangesloten, −810 / 86 / 839 W | nee |
+| `ES.GetMode` | `input_energy` / `output_energy` (0,1 Wh, **huis**meter) | 210,8 / 307,5 kWh | nee (bewust) |
+| `ES.GetStatus` | `bat_cap`, `pv_power`, `offgrid_power` | 4160 Wh, 0 W | nee |
+| `ES.GetStatus` | `total_grid_input_energy` / `total_grid_output_energy` (Wh) | **605,9 / 485,5 kWh** | **ja** (energietellers) |
+| `ES.GetStatus` | `total_pv_energy` (0,01 kWh), `total_load_energy` (Wh) | 0 / 0 | nee |
+| `Bat.GetStatus` | `soc`, `charg_flag`, `dischrg_flag`, `bat_temp` | 15 %, laden + ontladen toegestaan, **22 °C** | temperatuur ja |
+| `Bat.GetStatus` | `bat_capacity` (nog beschikbaar), `rated_capacity` | 653 van 4160 Wh | nee |
+| `EM.GetStatus` | `ct_state`, fasevermogens, `input_energy`/`output_energy` | ±10 W totaal | nee |
+| `Wifi.GetStatus` | `ssid`, `rssi`, `sta_ip`, `sta_gate`, `sta_mask`, `sta_dns` | `wifistiens`, **−84 dBm** | nee |
+| `BLE.GetStatus` | Bluetooth-status + BLE-MAC | `disconnect` | nee |
+| `PV.GetStatus` | 4× MPPT (`pv1..pv4_power/_voltage/_current/_state`) | **geen antwoord** op deze unit | nee |
+| `DOD.SET` | ontlaaddiepte instellen (30–88 %) | standaard 88 | nee |
+| `Set.Ver` | vermogensversie (800/1200/1500/2200/2500 W) | 2500 | nee |
+| `Led.Ctrl`, `Ble.Adv`, `Reset.Factory` | paneel-LED, Bluetooth-uitzending, fabrieksreset | — | nee |
+
+Interessant om nog toe te voegen (in volgorde van nut):
+
+1. **WiFi-signaalsterkte** (`rssi`): nu **−84 dBm**, dat is zwak. Dat verklaart
+   waarschijnlijk de wisselvalligheid van de UDP-server ("geen antwoord").
+2. **Nog beschikbaar vermogen in Wh** (`bat_capacity`): "653 van 4160 Wh" is
+   concreter dan alleen een percentage.
+3. **`target_power`** (Homey ≥ v12.13): met de **Passive**-modus kan Homey zelf het
+   laad-/ontlaadvermogen sturen, zodat de batterij meedoet in Homey's energiebeheer.
+4. **PV-ingangen** (alleen Venus A/D): per MPPT stroom, spanning en status - op deze
+   unit antwoordt `PV.GetStatus` niet, dus eerst uitzoeken of er panelen op zitten.
+5. **DOD en de vermogenslimiet** als instelling of flowkaart (`DOD.SET`, `Set.Ver`).
 
 Alle wire-formats staan op één plek: [`lib/marstek.js`](lib/marstek.js).
 Wijkt jouw firmware af (andere veldnamen of een andere modusnaam voor "uit"),

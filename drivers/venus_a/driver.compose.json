@@ -4,11 +4,14 @@
     "en": "Marstek Venus A",
     "nl": "Marstek Venus A"
   },
-  "class": "socket",
+  "class": "battery",
   "capabilities": [
     "onoff",
     "measure_battery",
-    "measure_power"
+    "measure_power",
+    "meter_power.charged",
+    "meter_power.discharged",
+    "measure_temperature"
   ],
   "capabilitiesOptions": {
     "onoff": {
@@ -28,12 +31,30 @@
         "en": "Battery power",
         "nl": "Batterijvermogen"
       }
+    },
+    "meter_power.charged": {
+      "title": {
+        "en": "Charged energy",
+        "nl": "Geladen energie"
+      }
+    },
+    "meter_power.discharged": {
+      "title": {
+        "en": "Discharged energy",
+        "nl": "Ontladen energie"
+      }
+    },
+    "measure_temperature": {
+      "title": {
+        "en": "Battery temperature",
+        "nl": "Batterijtemperatuur"
+      }
     }
   },
   "energy": {
-    "batteries": [
-      "OTHER"
-    ]
+    "homeBattery": true,
+    "meterPowerImportedCapability": "meter_power.charged",
+    "meterPowerExportedCapability": "meter_power.discharged"
   },
   "images": {
     "small": "/drivers/venus_a/assets/images/small.png",
