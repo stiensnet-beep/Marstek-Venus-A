@@ -443,6 +443,12 @@ module.exports = class VenusADevice extends Homey.Device {
   async _applyWifi(wifi) {
     if (!wifi) return;
 
+    // Elke ronde loggen, ook als de waarde gelijk blijft: in het app-log is dan
+    // te zien dat het uitlezen doorloopt terwijl het getal uren hetzelfde is.
+    if (Number.isFinite(wifi.rssi)) {
+      this.log(`WiFi: ${wifi.rssi} dBm (${rssiQuality(wifi.rssi) || 'onbekend'}) via ${wifi.ssid || '?'}`);
+    }
+
     if (Number.isFinite(wifi.rssi) && this.hasCapability('measure_signal_strength')) {
       if (this.getCapabilityValue('measure_signal_strength') !== wifi.rssi) {
         await this.setCapabilityValue('measure_signal_strength', wifi.rssi);
@@ -471,6 +477,11 @@ module.exports = class VenusADevice extends Homey.Device {
 
     const kwaliteit = rssiQuality(wifi.rssi);
 
+    // Tijdstip van deze uitlezing. Homey legt een capaciteitswaarde alleen vast
+    // als die verandert; met deze regel is te zien dat de app blijft lezen, ook
+    // als de batterij urenlang dezelfde RSSI meldt.
+    zet('wifi_bijgewerkt', this._formatteerTijd(new Date()));
+
     zet('wifi_ssid', wifi.ssid);
     zet('wifi_rssi', Number.isFinite(wifi.rssi)
       ? `${wifi.rssi} dBm${kwaliteit ? ` (${kwaliteit})` : ''}`
@@ -485,6 +496,26 @@ module.exports = class VenusADevice extends Homey.Device {
       await this.setSettings(nieuwe);
     } catch (err) {
       this.log('WiFi-regels bijwerken mislukt:', err.message);
+    }
+  }
+
+  /**
+   * Tijd in de tijdzone van de Homey, bijvoorbeeld "16:50". Valt terug op UTC
+   * als de runtime geen tijdzonegegevens heeft.
+   *
+   * @param {Date} datum
+   * @returns {string}
+   */
+  _formatteerTijd(datum) {
+    try {
+      const tijdzone = this.homey.clock.getTimezone();
+      return new Intl.DateTimeFormat('nl-NL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: tijdzone,
+      }).format(datum);
+    } catch (err) {
+      return `${datum.toISOString().slice(11, 16)} UTC`;
     }
   }
 

@@ -100,11 +100,20 @@ hebben een bescheiden WiFi-radio en de Marstek-app laat daar weinig van zien.
 | Netwerk (SSID) | Apparaatinstellingen → **WiFi van de batterij** | `ssid` |
 | Signaalsterkte als tekst | idem, bijv. `-87 dBm (zeer zwak)` | `rssi` + kwaliteitsklasse |
 | IP-adres, gateway/subnetmasker, MAC | idem | `sta_ip`, `sta_gate` / `sta_mask`, `wifi_mac` |
+| Laatst uitgelezen | idem | tijdstip van de laatste geslaagde `Wifi.GetStatus` |
 
 De RSSI is een echte dBm-waarde: rond **-30** is uitstekend, **-67** is de gebruikelijke
 grens voor vloeiend streamen, onder **-80** wordt het wankel en rond **-90** houdt het op.
 Homey toont de waarde in **dB**, want dat is de eenheid van de standaardcapaciteit
 `measure_signal_strength`.
+
+> **Waarom het getal urenlang hetzelfde kan blijven:** Homey legt een capaciteitswaarde
+> alleen vast als die écht verandert, en de batterij meldt zijn RSSI traag (in de praktijk
+> schuift die met stapjes van 1 dB per uur). Het is dus normaal dat *WiFi-signaal* lang op
+> bijvoorbeeld `-86` blijft staan; dat betekent niet dat de app niet leest. Dat je het
+> uitlezen kunt volgen, zie je aan de regel **Laatst uitgelezen** in de instellingen (die
+> verspringt bij elke WiFi-ronde) en aan de logregel *WiFi: -86 dBm (zeer zwak) via
+> wifistiens*.
 
 Omdat het die standaardcapaciteit is, maakt Homey automatisch de flow-trigger
 *De signaalsterkte is veranderd* aan (met de nieuwe waarde als token). Daarmee kun je

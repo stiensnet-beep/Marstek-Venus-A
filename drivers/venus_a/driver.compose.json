@@ -218,6 +218,12 @@
           "type": "label",
           "label": { "en": "Wi-Fi MAC address", "nl": "WiFi-MAC-adres" },
           "value": "onbekend"
+        },
+        {
+          "id": "wifi_bijgewerkt",
+          "type": "label",
+          "label": { "en": "Last read", "nl": "Laatst uitgelezen" },
+          "value": "onbekend"
         }
       ]
     }
