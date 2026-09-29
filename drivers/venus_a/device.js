@@ -1,7 +1,14 @@
 'use strict';
 
 const Homey = require('homey');
-const { MarstekClient, parseStatus, normalizeMode, DEFAULT_PORT } = require('../../lib/marstek');
+const {
+  MarstekClient,
+  parseStatus,
+  parseWifi,
+  rssiQuality,
+  normalizeMode,
+  DEFAULT_PORT,
+} = require('../../lib/marstek');
 
 const MAX_FAILURES = 3;
 
@@ -12,6 +19,14 @@ const MAX_FAILURES = 3;
  * dit maar één op de zoveel rondes opgehaald (bij 60 s pollen: elke 5 minuten).
  */
 const ENERGY_EVERY = 5;
+
+/**
+ * De WiFi-status (Wifi.GetStatus: SSID, RSSI, IP-instellingen) is ook een extra
+ * UDP-verzoek. Die gaat in een eigen ronde - ronde 2, 7, 12, ... - zodat er
+ * nooit drie verzoeken achter elkaar naar de batterij gaan. Bij het standaard
+ * poll-interval van 60 s dus elke 5 minuten.
+ */
+const WIFI_EVERY = 5;
 
 /**
  * Default max age (ms) for the cached mode used by the `mode_is` condition
@@ -80,6 +95,20 @@ module.exports = class VenusADevice extends Homey.Device {
   }
 
   async onSettings({ changedKeys }) {
+    // De app schrijft ook zelf naar de instellingen (de WiFi-statusregels via
+    // _applyWifiLabels). Zo'n schrijfactie mag geen extra poll uitlokken, dus
+    // alleen reageren op de instellingen die de gebruiker zelf beheert.
+    const eigenInstellingen = [
+      'host',
+      'port',
+      'poll_interval',
+      'mode_on',
+      'mode_off',
+      'manual_power',
+      'energy_exclude',
+    ];
+    if (!changedKeys.some((key) => eigenInstellingen.includes(key))) return;
+
     if (changedKeys.includes('host') || changedKeys.includes('port')) {
       this._client = null;
     }
@@ -209,6 +238,7 @@ module.exports = class VenusADevice extends Homey.Device {
       'meter_power.charged',
       'meter_power.discharged',
       'measure_temperature',
+      'measure_signal_strength',
     ];
 
     for (const capability of capabilities) {
@@ -291,6 +321,12 @@ module.exports = class VenusADevice extends Homey.Device {
     this._pollCount += 1;
     if (this._pollCount === 1 || this._pollCount % ENERGY_EVERY === 0) {
       await this._syncEnergy(client);
+    }
+
+    // WiFi-status in een eigen ronde (zie WIFI_EVERY): zo gaan er nooit drie
+    // verzoeken tegelijk naar de batterij.
+    if (this._pollCount === 2 || this._pollCount % WIFI_EVERY === 2) {
+      await this._syncWifi(client);
     }
 
     this._onSuccess();
@@ -381,6 +417,74 @@ module.exports = class VenusADevice extends Homey.Device {
       if (this.getCapabilityValue(capability) !== afgerond) {
         await this.setCapabilityValue(capability, afgerond);
       }
+    }
+  }
+
+  /**
+   * WiFi-status ophalen: SSID, RSSI en de IP-instellingen van de batterij.
+   *
+   * De RSSI gaat als `measure_signal_strength` naar Homey. Homey toont dat als
+   * "Signaalsterkte" (dB) op de apparaatpagina en legt het vast in Insights,
+   * zodat je kunt terugzien wanneer het signaal wegzakte. De rest - SSID, IP,
+   * gateway, subnetmasker en MAC - komt als leesbare regel in de
+   * apparaatinstellingen.
+   *
+   * @param {MarstekClient} client
+   */
+  async _syncWifi(client) {
+    const result = await client.getWifiStatus().catch((err) => {
+      this.log('Wifi.GetStatus mislukt:', err.message);
+      return null;
+    });
+
+    await this._applyWifi(parseWifi(result));
+  }
+
+  async _applyWifi(wifi) {
+    if (!wifi) return;
+
+    if (Number.isFinite(wifi.rssi) && this.hasCapability('measure_signal_strength')) {
+      if (this.getCapabilityValue('measure_signal_strength') !== wifi.rssi) {
+        await this.setCapabilityValue('measure_signal_strength', wifi.rssi);
+      }
+    }
+
+    await this._applyWifiLabels(wifi);
+  }
+
+  /**
+   * De WiFi-gegevens als tekstregels in de apparaatinstellingen zetten
+   * (`type: "label"`). Alleen schrijven wat echt veranderd is: elke
+   * setSettings() is een schrijfopdracht naar de Homey.
+   *
+   * @param {object} wifi parseWifi(Wifi.GetStatus)
+   */
+  async _applyWifiLabels(wifi) {
+    const huidig = this.getSettings();
+    const nieuwe = {};
+
+    const zet = (sleutel, waarde) => {
+      if (waarde === null || waarde === undefined || waarde === '') return;
+      const tekst = String(waarde);
+      if (huidig[sleutel] !== tekst) nieuwe[sleutel] = tekst;
+    };
+
+    const kwaliteit = rssiQuality(wifi.rssi);
+
+    zet('wifi_ssid', wifi.ssid);
+    zet('wifi_rssi', Number.isFinite(wifi.rssi)
+      ? `${wifi.rssi} dBm${kwaliteit ? ` (${kwaliteit})` : ''}`
+      : null);
+    zet('wifi_ip', wifi.ip);
+    zet('wifi_gateway', [wifi.gateway, wifi.mask].filter((deel) => deel).join(' / '));
+    zet('wifi_mac', wifi.mac);
+
+    if (!Object.keys(nieuwe).length) return;
+
+    try {
+      await this.setSettings(nieuwe);
+    } catch (err) {
+      this.log('WiFi-regels bijwerken mislukt:', err.message);
     }
   }
 

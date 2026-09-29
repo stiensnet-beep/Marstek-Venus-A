@@ -11,7 +11,8 @@
     "measure_power",
     "meter_power.charged",
     "meter_power.discharged",
-    "measure_temperature"
+    "measure_temperature",
+    "measure_signal_strength"
   ],
   "capabilitiesOptions": {
     "onoff": {
@@ -48,6 +49,12 @@
       "title": {
         "en": "Battery temperature",
         "nl": "Batterijtemperatuur"
+      }
+    },
+    "measure_signal_strength": {
+      "title": {
+        "en": "Wi-Fi signal",
+        "nl": "WiFi-signaal"
       }
     }
   },
@@ -172,6 +179,45 @@
             "en": "Only used when the on/off mapping uses the Manual mode",
             "nl": "Wordt alleen gebruikt als de aan/uit koppeling de Manual-modus gebruikt"
           }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "label": {
+        "en": "Wi-Fi of the battery (read-only)",
+        "nl": "WiFi van de batterij (alleen lezen)"
+      },
+      "children": [
+        {
+          "id": "wifi_ssid",
+          "type": "label",
+          "label": { "en": "Network (SSID)", "nl": "Netwerk (SSID)" },
+          "value": "onbekend"
+        },
+        {
+          "id": "wifi_rssi",
+          "type": "label",
+          "label": { "en": "Signal strength", "nl": "Signaalsterkte" },
+          "value": "onbekend"
+        },
+        {
+          "id": "wifi_ip",
+          "type": "label",
+          "label": { "en": "IP address (battery)", "nl": "IP-adres (batterij)" },
+          "value": "onbekend"
+        },
+        {
+          "id": "wifi_gateway",
+          "type": "label",
+          "label": { "en": "Gateway / netmask", "nl": "Gateway / subnetmasker" },
+          "value": "onbekend"
+        },
+        {
+          "id": "wifi_mac",
+          "type": "label",
+          "label": { "en": "Wi-Fi MAC address", "nl": "WiFi-MAC-adres" },
+          "value": "onbekend"
         }
       ]
     }

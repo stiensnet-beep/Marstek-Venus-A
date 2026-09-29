@@ -1,6 +1,6 @@
 # Marstek Venus voor Homey — **BETA**
 
-**Gemaakt door JPD** · versie `0.2.0` (BETA 2) · Homey SDK 3 (lokaal)
+**Gemaakt door JPD** · versie `0.3.0` (BETA 2) · Homey SDK 3 (lokaal)
 
 > Homey staat geen pre-release versienummers toe (`0.1.0-beta.1` werd door de validator
 > geweigerd). In het app-manifest staat daarom `0.1.0`; de BETA-status blijkt uit de
@@ -10,11 +10,12 @@
 > breed uitgerold. Gebruik hem op eigen verantwoordelijkheid: je stuurt een echte
 > thuisbatterij aan. Zie ook de sectie *Risico's* onderaan.
 
-> **Upgraden van 0.1.x naar 0.2.0?** Homey legt de klasse van een apparaat vast bij het
-> koppelen; een bestaand apparaat blijft dus `socket` staan en komt niet in het
-> energieoverzicht. Verwijder het apparaat in de Homey-app en voeg het opnieuw toe - zie
-> [`README.md` § Energieoverzicht](README.md#energieoverzicht-energy-tab). Koppel je 0.2.0
-> voor het eerst, dan gaat het automatisch goed.
+> **Upgraden van 0.1.x?** Homey legt de klasse van een apparaat vast bij het koppelen; een
+> bestaand apparaat blijft dus `socket` staan en komt niet in het energieoverzicht. Sinds
+> **0.2.1** zet de app de klasse zelf recht met `device.setClass('battery')`, dus opnieuw
+> koppelen is niet meer nodig. Lukt het toch niet, dan blijft verwijderen + opnieuw
+> toevoegen de terugvaloptie - zie
+> [`README.md` § Energieoverzicht](README.md#energieoverzicht-energy-tab).
 
 ---
 
@@ -23,7 +24,7 @@
 | Wel | Nog niet |
 |---|---|
 | Getest en werkend op een **Venus E 3.0** (fw 150) en een **Venus A** (fw 148) | Getest op de Venus C, D, E mini en Jupiter — de API-documentatie noemt ze, maar we hebben ze niet in handen gehad |
-| Uitlezen van modus, SOC, vermogen, temperatuur en kWh-tellers + aan/uit schakelen vanuit Homey-flows | PV-ingangen, DOD-instellingen en sturen op een doelvermogen |
+| Uitlezen van modus, SOC, vermogen, temperatuur, kWh-tellers en WiFi-signaal + aan/uit schakelen vanuit Homey-flows | PV-ingangen, DOD-instellingen en sturen op een doelvermogen |
 | Werkt naast de bestaande Venus E-app | Garantie op werking na een firmware-update van Marstek |
 | Fouten worden duidelijk gemeld en de app herstelt zichzelf | Ondersteuning van Marstek zelf (het is geen officiële integratie) |
 

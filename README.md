@@ -1,6 +1,6 @@
 # Marstek Venus — Homey app (**BETA**)
 
-**Gemaakt door JPD** · versie `0.2.0` (BETA 2) · Homey SDK 3 (lokaal)
+**Gemaakt door JPD** · versie `0.3.0` (BETA 2) · Homey SDK 3 (lokaal)
 
 > **BETA:** de app werkt en is getest op een **Venus E 3.0 (fw 150)** en een **Venus A
 > (fw 148)**, maar is nog niet breed uitgerold en is geen officiele Marstek-integratie.
@@ -45,7 +45,8 @@ daar niets aan toe en kan naast die app bestaan.
 **Apparaten**
 - Marstek Venus A (driver `venus_a`), klasse **battery** (thuisbatterij), met de capaciteiten
   `onoff`, `measure_battery`, `measure_power`, `meter_power.charged`,
-  `meter_power.discharged` en `measure_temperature`.
+  `meter_power.discharged`, `measure_temperature` en `measure_signal_strength`
+  (het WiFi-signaal van de batterij, sinds 0.3.0).
 
 **Flows — acties (ingebouwd via de `onoff`-capaciteit)**
 - *Zet aan* (schakelt naar de in de instellingen gekozen "aan"-modus, standaard `Auto` met `auto_cfg.enable = 1`)
@@ -88,32 +89,56 @@ minuten. De temperatuur lift mee op dezelfde ronde.
 > zijn de **CT-waarden van het huis** (import/export van de meterkast), niet de lading van
 > de batterij. Die worden daarom bewust niet als batterijteller gebruikt.
 
-### Al gekoppeld? Eenmalig opnieuw toevoegen
+### WiFi-status van de batterij
 
-Homey legt de **klasse van een apparaat vast op het moment van koppelen**. Had je de
-batterij al in Homey voordat je 0.2.0 installeerde, dan blijft hij op de oude klasse
-(`socket`) staan - ook na een app-update of een herstart van de app. Je ziet dan wél de
-nieuwe waarden (temperatuur en kWh-tellers), maar de batterij komt **niet** in het
-energieoverzicht.
+Sinds **0.3.0** is de WiFi-status van de accu zelf zichtbaar - handig, want deze batterijen
+hebben een bescheiden WiFi-radio en de Marstek-app laat daar weinig van zien.
 
-Eenmalige oplossing:
+| Waarde | Waar te zien | Waar het vandaan komt |
+|---|---|---|
+| Signaalsterkte (dB) | Capaciteit **WiFi-signaal** op de apparaatpagina en in **Insights** | `Wifi.GetStatus` (`rssi`, dBm) |
+| Netwerk (SSID) | Apparaatinstellingen → **WiFi van de batterij** | `ssid` |
+| Signaalsterkte als tekst | idem, bijv. `-87 dBm (zeer zwak)` | `rssi` + kwaliteitsklasse |
+| IP-adres, gateway/subnetmasker, MAC | idem | `sta_ip`, `sta_gate` / `sta_mask`, `wifi_mac` |
 
-1. Homey-app → **Apparaten** → **Schuur accu** (of jouw naam) → **tandwiel** → **Verwijderen**.
-2. **+** → **Marstek Venus** → **Marstek Venus A** → kies de regel met het IP-adres van je
-   Venus A (`192.168.1.118`).
-3. Klaar: het apparaat heeft nu klasse `battery` en staat in **Energie → Thuisbatterij**.
+De RSSI is een echte dBm-waarde: rond **-30** is uitstekend, **-67** is de gebruikelijke
+grens voor vloeiend streamen, onder **-80** wordt het wankel en rond **-90** houdt het op.
+Homey toont de waarde in **dB**, want dat is de eenheid van de standaardcapaciteit
+`measure_signal_strength`.
 
-> Met de API is dit niet te repareren: `homey api devices update-device` negeert `class`
-> (gecontroleerd op firmware 13.5.1) en ook een herstart van de app verandert de klasse
-> niet. Alleen opnieuw koppelen werkt.
+Omdat het die standaardcapaciteit is, maakt Homey automatisch de flow-trigger
+*De signaalsterkte is veranderd* aan (met de nieuwe waarde als token). Daarmee kun je
+bijvoorbeeld een melding laten sturen zodra het signaal onder de -80 zakt.
+
+> WiFi kost ook een extra UDP-verzoek, dus het gaat in een **eigen ronde** (ronde 2, 7, 12,
+> ...): er gaan nooit drie verzoeken tegelijk naar de batterij. Bij het standaardinterval
+> van 60 s dus elke 5 minuten. De regels in de instellingen worden alleen bijgewerkt als er
+> echt iets veranderd is.
+
+### Al gekoppeld? Meestal gaat het vanzelf
+
+Homey legt de **klasse van een apparaat vast op het moment van koppelen** en een
+app-update verandert die niet. Een apparaat dat met 0.1.x als `socket` is gekoppeld zou dus
+buiten het energieoverzicht blijven. Daarom zet de app sinds **0.2.1** de klasse bij het
+starten zelf recht met `device.setClass('battery')`; je hoeft daar niets voor te doen. In
+het Homey-log staat dan *Klasse bijgewerkt van "socket" naar "battery"*.
+
+Blijft de batterij onverwacht toch buiten **Energie → Thuisbatterij**, verwijder het
+apparaat dan eenmalig en voeg het opnieuw toe: **Apparaten → tandwiel → Verwijderen** en
+daarna **+ → Marstek Venus → Marstek Venus A** met het IP-adres van je Venus A.
+
+> Via de API is `class` niet te wijzigen: `homey api devices update-device` negeert het veld
+> (gecontroleerd op firmware 13.5.1) en een herstart van de app helpt niet. Vandaar de
+> migratie in de app zelf, en anders opnieuw koppelen.
 
 ---
 
 ## 2. Vereisten
 
-- Homey Pro met firmware **12 of nieuwer** (getest op 13.5.1), app draait **lokaal** op
-  Homey. Sinds 0.2.0 is Homey 12 het minimum: de klasse `battery` (thuisbatterij) die
-  nodig is voor het energieoverzicht bestaat niet in oudere firmware.
+- Homey Pro met firmware **12.2 of nieuwer** (getest op 13.5.1), app draait **lokaal** op
+  Homey. Sinds 0.2.0 is Homey 12 het minimum (de klasse `battery` voor het
+  energieoverzicht bestaat niet in oudere firmware) en sinds 0.3.0 is dat **12.2**, omdat
+  de capaciteit `measure_signal_strength` (WiFi-signaal) pas vanaf die versie bestaat.
 - Node.js 18+ en de Homey CLI op je computer om de app te installeren/bouwen
   (op deze computer: Node.js **v24** met Homey CLI **4.5.0**). Ontbreekt Node.js?
   Installeer het met `winget install OpenJS.NodeJS.LTS` of via <https://nodejs.org>,
@@ -216,10 +241,11 @@ IP's met je router (of met de netwerkinfo in de Marstek-app) en koppel alleen de
 |---|---|---|
 | **IP-adres** | *leeg* | Lokaal IP van de batterij, bijv. `192.168.1.50` |
 | **UDP-poort** | `30000` | Poort van de lokale API (UDP) |
-| **Poll-interval** | `30` | Seconden tussen uitlezen van modus/status. `0` = niet pollen |
+| **Poll-interval** | `60` | Seconden tussen uitlezen van modus/status. `0` = niet pollen |
 | **Modus bij INSCHAKELEN** | `Auto` | Modus die bij "aan" wordt gezet (sub-config aan) |
 | **Modus bij UITSCHAKELEN** | `Manual` | Modus die bij "uit" wordt gezet (sub-config uit = batterij doet niets) |
-| **Vermogen in Manual-modus** | `800` | Watt, alleen gebruikt als de aan/uit-koppeling `Manual` gebruikt |
+| **Vermogen in Manual-modus** | `1000` | Watt, alleen gebruikt als de aan/uit-koppeling `Manual` gebruikt |
+| **WiFi van de batterij** | *automatisch* | Alleen-lezen: SSID, signaalsterkte, IP, gateway/subnetmasker en MAC, gevuld uit `Wifi.GetStatus` |
 
 Het "aan/uit"-vinkje in Homey wordt afgeleid uit de modus: **uit = de modus die bij
 uitschakelen is ingesteld**, elke andere modus betekent **aan**. Kies je voor aan én
