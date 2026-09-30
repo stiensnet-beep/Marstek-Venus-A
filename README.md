@@ -83,7 +83,8 @@ niet, waardoor de batterij nergens in het energieoverzicht stond - ook niet met
 | Waarde | Homey-capaciteit | Waar het vandaan komt |
 |---|---|---|
 | Batterijniveau (%) | `measure_battery` | `ES.GetMode` / `Bat.GetStatus` (`bat_soc`) |
-| Batterijvermogen (W, negatief = ontladen) | `measure_power` | `ES.GetMode` (`ongrid_power`) |
+| Batterijvermogen (W, positief = laden, negatief = ontladen) | `measure_power` | `ES.GetMode` (`ongrid_power`, met omgedraaid teken - zie hieronder) |
+| Modus (`Auto`, `AI`, `UPS`, `Manual`, `Passive`) | `operation_mode` (eigen capaciteit, alleen lezen) | `ES.GetMode` (`mode`) |
 | Geladen energie (kWh, cumulatief) | `meter_power.charged` | `ES.GetStatus` (`total_grid_input_energy`) |
 | Ontladen energie (kWh, cumulatief) | `meter_power.discharged` | `ES.GetStatus` (`total_grid_output_energy`) |
 | Batterijtemperatuur (°C) | `measure_temperature` | `Bat.GetStatus` (`bat_temp`) |
@@ -92,6 +93,12 @@ De twee energietellers worden niet bij elke poll opgehaald: dat kost twee extra
 UDP-verzoeken en deze batterijen houden niet van veel verkeer. Ze komen één keer bij het
 starten en daarna elke vijfde ronde - bij het standaardinterval van 60 s dus elke 5
 minuten. De temperatuur lift mee op dezelfde ronde.
+
+> **Teken van het vermogen:** `ongrid_power` is het vermogen aan de netkant van de batterij en
+> is **positief bij ontladen** (op 18-09-2026 gemeten: bij +934 W liep de opgeslagen energie in
+> 15 minuten 109 Wh terug). Homey verwacht bij een thuisbatterij juist positief = laden. Sinds
+> **0.3.3** draait de app het teken om; tot en met 0.3.2 stond de richting in Homey Energy
+> verkeerd om.
 
 > Let op: `ES.GetMode` bevat ook `input_energy` / `output_energy` (in 0,1 Wh), maar dat
 > zijn de **CT-waarden van het huis** (import/export van de meterkast), niet de lading van

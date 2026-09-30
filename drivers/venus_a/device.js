@@ -251,6 +251,7 @@ module.exports = class VenusADevice extends Homey.Device {
       'meter_power.discharged',
       'measure_temperature',
       'measure_signal_strength',
+      'operation_mode',
     ];
 
     for (const capability of capabilities) {
@@ -404,6 +405,13 @@ module.exports = class VenusADevice extends Homey.Device {
     const onoff = this._modeToOnoff(mode);
     if (this.getCapabilityValue('onoff') !== onoff) {
       await this.setCapabilityValue('onoff', onoff);
+    }
+
+    // De modus ook als capaciteit, zodat hij op de apparaatpagina staat en
+    // andere apps (zoals het energiedashboard) hem via de Homey-API kunnen lezen.
+    if (this.hasCapability('operation_mode') && this.getCapabilityValue('operation_mode') !== mode) {
+      await this.setCapabilityValue('operation_mode', mode)
+        .catch((err) => this.log('Modus-capaciteit bijwerken mislukt:', err.message));
     }
 
     if (changed) {
