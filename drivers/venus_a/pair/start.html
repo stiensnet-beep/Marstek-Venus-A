@@ -83,6 +83,7 @@
 
     var devices = [];
     var selectedIndex = -1;
+    var started = false;
 
     function el(id) {
       return document.getElementById(id);
@@ -162,6 +163,12 @@
         setStatus('Koppelen kan niet starten: de Homey-app gaf geen koppel-API mee.', true);
         return;
       }
+
+      // Zowel onHomeyReady als de directe aanroep onderaan kunnen start()
+      // uitvoeren. Een tweede start zou een tweede click-handler op "Volgende"
+      // hangen, en dan maakt één klik het apparaat twee keer aan.
+      if (started) return;
+      started = true;
 
       try {
         if (typeof Homey.setTitle === 'function') Homey.setTitle('Marstek Venus');

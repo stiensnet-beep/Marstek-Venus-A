@@ -55,7 +55,15 @@ daar niets aan toe en kan naast die app bestaan.
 
 **Flows — acties (eigen kaart)**
 - *Batterijmodus instellen*: kies een apparaat en een modus
-  (`Auto`, `AI`, `UPS`, `Manual`, `Passive` — de officiële Marstek-modi).
+  (`Auto`, `AI`, `UPS`, `Manual`, `Passive` — de officiële Marstek-modi), en optioneel
+  een vermogen in W voor `Manual` en `Passive` (leeg = **Vermogen in Manual-modus** uit de
+  instellingen).
+
+  > Let op: `Manual` schrijft één tijdslot van het batterijschema: 00:00-23:59, elke
+  > dag, met het gekozen vermogen. Welk slot dat is, stel je in bij **Schemaslot voor
+  > Manual** (standaard 0). Kies een slot dat je in de Marstek-app niet gebruikt, anders
+  > wordt dat deel van je schema overschreven. Dat geldt ook voor aan/uit als die
+  > `Manual` gebruikt.
 
 **Flows — conditie**
 - *Batterijmodus is ...*: vergelijkt de actuele modus met de gekozen modus.
@@ -113,7 +121,7 @@ Homey toont de waarde in **dB**, want dat is de eenheid van de standaardcapacite
 > bijvoorbeeld `-86` blijft staan; dat betekent niet dat de app niet leest. Dat je het
 > uitlezen kunt volgen, zie je aan de regel **Laatst uitgelezen** in de instellingen (die
 > verspringt bij elke WiFi-ronde) en aan de logregel *WiFi: -86 dBm (zeer zwak) via
-> wifistiens*.
+> MY_WIFI*.
 
 Omdat het die standaardcapaciteit is, maakt Homey automatisch de flow-trigger
 *De signaalsterkte is veranderd* aan (met de nieuwe waarde als token). Daarmee kun je
@@ -250,10 +258,11 @@ IP's met je router (of met de netwerkinfo in de Marstek-app) en koppel alleen de
 |---|---|---|
 | **IP-adres** | *leeg* | Lokaal IP van de batterij, bijv. `192.168.1.50` |
 | **UDP-poort** | `30000` | Poort van de lokale API (UDP) |
-| **Poll-interval** | `60` | Seconden tussen uitlezen van modus/status. `0` = niet pollen |
+| **Poll-interval** | `60` | Seconden tussen uitlezen van modus/status. `0` = niet pollen; minder dan 30 wordt 30. Een nieuwe ronde start pas als de vorige klaar is |
 | **Modus bij INSCHAKELEN** | `Auto` | Modus die bij "aan" wordt gezet (sub-config aan) |
 | **Modus bij UITSCHAKELEN** | `Manual` | Modus die bij "uit" wordt gezet (sub-config uit = batterij doet niets) |
-| **Vermogen in Manual-modus** | `1000` | Watt, alleen gebruikt als de aan/uit-koppeling `Manual` gebruikt |
+| **Vermogen in Manual-modus** | `800` | Watt voor `Manual` en `Passive`, bij aan/uit en bij de flowkaart zonder eigen vermogen |
+| **Schemaslot voor Manual** | `0` | Tijdslot (0-9) van het batterijschema dat `Manual` schrijft; kies er een dat je in de Marstek-app niet gebruikt |
 | **WiFi van de batterij** | *automatisch* | Alleen-lezen: SSID, signaalsterkte, IP, gateway/subnetmasker en MAC, gevuld uit `Wifi.GetStatus` |
 
 Het "aan/uit"-vinkje in Homey wordt afgeleid uit de modus: **uit = de modus die bij
@@ -287,7 +296,7 @@ wordt de sub-configuratie uitgeschakeld (`enable = 0`).
 
 **Handmatig ontladen met vast vermogen**
 
-- *DAN* — Batterijmodus instellen → modus `Manual` (gebruikt het ingestelde wattage)
+- *DAN* — Batterijmodus instellen → modus `Manual`, vermogen leeg (ingesteld wattage) of bijv. `500`
 
 ---
 
@@ -357,15 +366,18 @@ Bij `Manual` wordt extra configuratie meegestuurd:
 }}}
 ```
 
+`time_num` is het schemaslot uit de instelling **Schemaslot voor Manual** (standaard 0) en
+`power` het vermogen van de flowkaart of uit de instellingen.
+
 ### Wat de API nog meer geeft
 
 Alles hieronder komt uit de officiële *Marstek Device Open API Rev 3.1*. De kolom
-"Venus A nu" is wat de batterij op **29-09-2026** teruggaf (fw 148, 192.168.1.118),
+"Venus A nu" is wat de batterij op **29-09-2026** teruggaf (fw 148; IP-adres en WiFi-naam hieronder vervangen door voorbeelden),
 opgevraagd met `node tools/marstek-cli.js`; de laatste kolom zegt of de app het gebruikt.
 
 | Commando | Gegeven | Venus A nu | In de app? |
 |---|---|---|---|
-| `Marstek.GetDevice` | model, firmware, BLE-MAC, WiFi-MAC, WiFi-naam, IP | `Venus A`, fw 148, `192.168.1.118` | deels (koppelen) |
+| `Marstek.GetDevice` | model, firmware, BLE-MAC, WiFi-MAC, WiFi-naam, IP | `Venus A`, fw 148, `192.168.1.51` | deels (koppelen) |
 | `ES.GetMode` | `mode`, `bat_soc`, `ongrid_power`, `offgrid_power` | `Auto`, 15 %, −133 W | ja (elke poll) |
 | `ES.GetMode` | `ct_state` + `a_power`/`b_power`/`c_power`/`total_power` (CT per fase) | CT aangesloten, −810 / 86 / 839 W | nee |
 | `ES.GetMode` | `input_energy` / `output_energy` (0,1 Wh, **huis**meter) | 210,8 / 307,5 kWh | nee (bewust) |
@@ -375,7 +387,7 @@ opgevraagd met `node tools/marstek-cli.js`; de laatste kolom zegt of de app het 
 | `Bat.GetStatus` | `soc`, `charg_flag`, `dischrg_flag`, `bat_temp` | 15 %, laden + ontladen toegestaan, **22 °C** | temperatuur ja |
 | `Bat.GetStatus` | `bat_capacity` (nog beschikbaar), `rated_capacity` | 653 van 4160 Wh | nee |
 | `EM.GetStatus` | `ct_state`, fasevermogens, `input_energy`/`output_energy` | ±10 W totaal | nee |
-| `Wifi.GetStatus` | `ssid`, `rssi`, `sta_ip`, `sta_gate`, `sta_mask`, `sta_dns` | `wifistiens`, **−84 dBm** | nee |
+| `Wifi.GetStatus` | `ssid`, `rssi`, `sta_ip`, `sta_gate`, `sta_mask`, `sta_dns` | `MY_WIFI`, **−84 dBm** | nee |
 | `BLE.GetStatus` | Bluetooth-status + BLE-MAC | `disconnect` | nee |
 | `PV.GetStatus` | 4× MPPT (`pv1..pv4_power/_voltage/_current/_state`) | **geen antwoord** op deze unit | nee |
 | `DOD.SET` | ontlaaddiepte instellen (30–88 %) | standaard 88 | nee |

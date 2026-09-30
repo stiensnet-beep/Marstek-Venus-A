@@ -13,6 +13,13 @@ const {
 const MAX_FAILURES = 3;
 
 /**
+ * Kortste poll-interval (s). Eén ronde kan met retries 15 tot 40 s duren; een
+ * korter interval dan dit zou vooral extra verkeer opleveren, en daar stopt de
+ * UDP-server van de batterij van met antwoorden. 0 blijft "uit".
+ */
+const MIN_POLL_INTERVAL = 30;
+
+/**
  * De energietellers (ES.GetStatus) en de temperatuur (Bat.GetStatus) zitten in
  * andere componenten dan ES.GetMode, dus dat zijn twee extra UDP-verzoeken.
  * De UDP-server van deze batterijen houdt niet van veel verkeer, daarom wordt
@@ -30,7 +37,7 @@ const WIFI_EVERY = 5;
 
 /**
  * Default max age (ms) for the cached mode used by the `mode_is` condition
- * card. The regular poll (>= 60s, see driver.compose.json) keeps this cache
+ * card. The regular poll (>= MIN_POLL_INTERVAL) keeps this cache
  * fresh, so a condition check normally doesn't need its own UDP round-trip -
  * that would double the traffic these batteries are sensitive to.
  */
@@ -48,6 +55,7 @@ module.exports = class VenusADevice extends Homey.Device {
     this._mode = this.getStoreValue('mode') || null;
     this._modeUpdatedAt = 0;
     this._pollCount = 0;
+    this._syncing = false;
 
     this._modeChangedTrigger = this.homey.flow.getDeviceTriggerCard('mode_changed');
 
@@ -105,6 +113,7 @@ module.exports = class VenusADevice extends Homey.Device {
       'mode_on',
       'mode_off',
       'manual_power',
+      'manual_slot',
       'energy_exclude',
     ];
     if (!changedKeys.some((key) => eigenInstellingen.includes(key))) return;
@@ -184,6 +193,9 @@ module.exports = class VenusADevice extends Homey.Device {
 
     const { setResult } = await client.setMode(mode, {
       power: settings.manualPower,
+      // Manual schrijft een tijdslot van het batterijschema; welk slot staat in
+      // de instellingen, zodat een eigen schema uit de Marstek-app heel blijft.
+      timeNum: settings.manualSlot,
       // De UDP-server van de batterij is wisselvallig: schrijfcommando's krijgen
       // iets meer geduld dan de periodieke uitlezing. De back-off is aan de
       // client-kant geplafonneerd (MAX_RETRY_DELAY), zodat dit plus de
@@ -260,6 +272,7 @@ module.exports = class VenusADevice extends Homey.Device {
       modeOn: settings.mode_on || 'Auto',
       modeOff: settings.mode_off || 'Manual',
       manualPower: Number(settings.manual_power) || 0,
+      manualSlot: Math.max(0, Math.min(9, Math.round(Number(settings.manual_slot) || 0))),
     };
   }
 
@@ -276,8 +289,13 @@ module.exports = class VenusADevice extends Homey.Device {
   _startPolling() {
     this._stopPolling();
 
-    const { pollInterval } = this._getSettings();
-    if (!pollInterval || pollInterval <= 0) return;
+    const { pollInterval: ingesteld } = this._getSettings();
+    if (!ingesteld || ingesteld <= 0) return;
+
+    const pollInterval = Math.max(ingesteld, MIN_POLL_INTERVAL);
+    if (pollInterval !== ingesteld) {
+      this.log(`Poll-interval ${ingesteld} s is te kort; ${pollInterval} s gebruikt`);
+    }
 
     this.log(`Polling elke ${pollInterval} seconden`);
     this._pollTimer = this.homey.setInterval(() => {
@@ -291,7 +309,26 @@ module.exports = class VenusADevice extends Homey.Device {
     this._pollTimer = null;
   }
 
+  /**
+   * Eén uitleesronde, nooit twee tegelijk. Met retries kan een ronde langer
+   * duren dan het poll-interval; zonder deze wacht stapelen de rondes zich op
+   * en krijgt de batterij juist het verkeer waar hij niet tegen kan.
+   */
   async _sync() {
+    if (this._syncing) {
+      this.log('Vorige uitleesronde loopt nog; deze ronde overgeslagen');
+      return;
+    }
+
+    this._syncing = true;
+    try {
+      await this._syncOnce();
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  async _syncOnce() {
     const { host } = this._getSettings();
     if (!host) {
       this._setUnavailable('Vul het IP-adres van de batterij in bij de apparaatinstellingen');

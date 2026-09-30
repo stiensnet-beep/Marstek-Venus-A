@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.stiensnet.marstek",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "sdk": 3,
   "compatibility": ">=12.2.0",
   "platforms": [
@@ -118,8 +118,12 @@
           "nl": "Batterijmodus instellen"
         },
         "titleFormatted": {
-          "en": "Set mode to [[mode]]",
-          "nl": "Batterijmodus instellen op [[mode]]"
+          "en": "Set mode to [[mode]] with [[power]] W",
+          "nl": "Batterijmodus instellen op [[mode]] met [[power]] W"
+        },
+        "hint": {
+          "en": "Manual writes one slot of the battery schedule (the slot set in the device settings, all day, every day). Power is used by Manual and Passive; leave it empty to use the power from the device settings.",
+          "nl": "Manual schrijft één tijdslot van het batterijschema (het slot uit de apparaatinstellingen, de hele dag, elke dag). Het vermogen geldt voor Manual en Passive; leeg laten = het vermogen uit de apparaatinstellingen."
         },
         "args": [
           {
@@ -170,6 +174,22 @@
                 }
               }
             ]
+          },
+          {
+            "name": "power",
+            "type": "number",
+            "required": false,
+            "min": 0,
+            "max": 5000,
+            "step": 1,
+            "title": {
+              "en": "Power (W)",
+              "nl": "Vermogen (W)"
+            },
+            "placeholder": {
+              "en": "empty = device setting",
+              "nl": "leeg = apparaatinstelling"
+            }
           }
         ],
         "id": "set_mode"
@@ -321,8 +341,8 @@
               "min": 0,
               "max": 3600,
               "hint": {
-                "en": "How often the battery is polled. Keep this at 60 seconds or more: the local UDP server of these batteries stops answering when polled too often.",
-                "nl": "Hoe vaak de batterij wordt uitgelezen. Houd dit op 60 seconden of meer: de lokale UDP-server van deze batterijen stopt met antwoorden bij te vaak pollen."
+                "en": "How often the battery is polled. Keep this at 60 seconds or more: the local UDP server of these batteries stops answering when polled too often. Values below 30 are raised to 30.",
+                "nl": "Hoe vaak de batterij wordt uitgelezen. Houd dit op 60 seconden of meer: de lokale UDP-server van deze batterijen stopt met antwoorden bij te vaak pollen. Waarden onder 30 worden 30."
               }
             }
           ]
@@ -431,8 +451,23 @@
               "min": 0,
               "max": 5000,
               "hint": {
-                "en": "Only used when the on/off mapping uses the Manual mode",
-                "nl": "Wordt alleen gebruikt als de aan/uit koppeling de Manual-modus gebruikt"
+                "en": "Used by Manual and Passive, both for on/off and for the 'Set battery mode' flow card when it has no power of its own",
+                "nl": "Geldt voor Manual en Passive, zowel bij aan/uit als bij de flowkaart 'Batterijmodus instellen' zonder eigen vermogen"
+              }
+            },
+            {
+              "id": "manual_slot",
+              "type": "number",
+              "label": {
+                "en": "Schedule slot used for Manual (0-9)",
+                "nl": "Schemaslot voor Manual (0-9)"
+              },
+              "value": 0,
+              "min": 0,
+              "max": 9,
+              "hint": {
+                "en": "Manual mode writes this slot of the battery schedule (00:00-23:59, every day). Pick a slot you do not use in the Marstek app, otherwise that schedule entry is overwritten.",
+                "nl": "De Manual-modus schrijft dit slot van het batterijschema (00:00-23:59, elke dag). Kies een slot dat je in de Marstek-app niet gebruikt, anders wordt dat schema-onderdeel overschreven."
               }
             }
           ]

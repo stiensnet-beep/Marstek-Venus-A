@@ -20,7 +20,12 @@ module.exports = class MarstekVenusApp extends Homey.App {
       if (!device || typeof device.setMode !== 'function') {
         throw new Error('Marstek Venus A apparaat niet gevonden');
       }
-      await device.setMode(args.mode);
+      // Optioneel vermogen (Manual/Passive); leeg = het vermogen uit de
+      // apparaatinstellingen.
+      const power = Number(args.power);
+      const options = (args.power !== undefined && args.power !== null && args.power !== ''
+        && Number.isFinite(power)) ? { power } : {};
+      await device.setMode(args.mode, options);
       return true;
     });
 

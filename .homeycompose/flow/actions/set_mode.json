@@ -4,8 +4,12 @@
     "nl": "Batterijmodus instellen"
   },
   "titleFormatted": {
-    "en": "Set mode to [[mode]]",
-    "nl": "Batterijmodus instellen op [[mode]]"
+    "en": "Set mode to [[mode]] with [[power]] W",
+    "nl": "Batterijmodus instellen op [[mode]] met [[power]] W"
+  },
+  "hint": {
+    "en": "Manual writes one slot of the battery schedule (the slot set in the device settings, all day, every day). Power is used by Manual and Passive; leave it empty to use the power from the device settings.",
+    "nl": "Manual schrijft één tijdslot van het batterijschema (het slot uit de apparaatinstellingen, de hele dag, elke dag). Het vermogen geldt voor Manual en Passive; leeg laten = het vermogen uit de apparaatinstellingen."
   },
   "args": [
     {
@@ -31,6 +35,22 @@
         { "id": "Manual", "title": { "en": "Manual (schedule / fixed power)" } },
         { "id": "Passive", "title": { "en": "Passive (external control)" } }
       ]
+    },
+    {
+      "name": "power",
+      "type": "number",
+      "required": false,
+      "min": 0,
+      "max": 5000,
+      "step": 1,
+      "title": {
+        "en": "Power (W)",
+        "nl": "Vermogen (W)"
+      },
+      "placeholder": {
+        "en": "empty = device setting",
+        "nl": "leeg = apparaatinstelling"
+      }
     }
   ]
 }
