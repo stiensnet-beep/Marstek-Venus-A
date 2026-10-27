@@ -1,6 +1,6 @@
 # Marstek Venus — Homey app (**BETA**)
 
-**Gemaakt door JPD** · versie `0.3.0` (BETA 2) · Homey SDK 3 (lokaal)
+**Gemaakt door JPD** · versie `0.4.1` (BETA) · Homey SDK 3 (lokaal)
 
 > **BETA:** de app werkt en is getest op een **Venus E 3.0 (fw 150)** en een **Venus A
 > (fw 148)**, maar is nog niet breed uitgerold en is geen officiele Marstek-integratie.
@@ -65,8 +65,25 @@ daar niets aan toe en kan naast die app bestaan.
   > wordt dat deel van je schema overschreven. Dat geldt ook voor aan/uit als die
   > `Manual` gebruikt.
 
+  In `Passive` laadt een **negatief** vermogen en ontlaadt een positief vermogen (gemeten
+  op een Venus A, fw 148), 5 minuten lang.
+
+- *Laden van het net* (sinds 0.4.0): laden met een vast vermogen tot een doelpercentage of
+  hooguit een aantal minuten, bijvoorbeeld in de goedkoopste kwartieren van een dynamisch
+  contract. De app zet de batterij daarvoor in `Passive` en daarna zelf terug in de
+  aan-modus (normaal `Auto`), ook als de batterij even niet antwoordt. Elke andere
+  schakeling (aan/uit, de modus-kaart, de Marstek-app) beëindigt de sessie, zodat
+  bestaande flows voorrang houden.
+
+  > Tip bij twee batterijen op één meter: laat ze altijd **samen** laden. Laadt er één
+  > terwijl de ander op zelfconsumptie staat, dan ontlaadt de ander evenveel extra om de
+  > meter op 0 te houden, en laadt de eerste in feite uit de tweede, met verlies.
+
+- *Stop laden van het net* (sinds 0.4.0): beëindigt de sessie en zet de batterij terug.
+
 **Flows — conditie**
 - *Batterijmodus is ...*: vergelijkt de actuele modus met de gekozen modus.
+- *Laden van het net loopt / loopt niet* (sinds 0.4.0).
 - Daarnaast kun je de standaard Homey-conditiekaarten voor `onoff` gebruiken.
 
 **Flows — trigger**
