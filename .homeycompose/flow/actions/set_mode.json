@@ -8,8 +8,8 @@
     "nl": "Batterijmodus instellen op [[mode]] met [[power]] W"
   },
   "hint": {
-    "en": "Manual writes one slot of the battery schedule (the slot set in the device settings, all day, every day). Power is used by Manual and Passive; leave it empty to use the power from the device settings.",
-    "nl": "Manual schrijft één tijdslot van het batterijschema (het slot uit de apparaatinstellingen, de hele dag, elke dag). Het vermogen geldt voor Manual en Passive; leeg laten = het vermogen uit de apparaatinstellingen."
+    "en": "Manual writes one slot of the battery schedule (the slot set in the device settings, all day, every day). Power is used by Manual and Passive; leave it empty to use the power from the device settings. In Passive a negative power charges and a positive power discharges, for 5 minutes; to charge from the grid use 'Charge from the grid'.",
+    "nl": "Manual schrijft één tijdslot van het batterijschema (het slot uit de apparaatinstellingen, de hele dag, elke dag). Het vermogen geldt voor Manual en Passive; leeg laten = het vermogen uit de apparaatinstellingen. In Passive laadt een negatief vermogen en ontlaadt een positief vermogen, 5 minuten lang; om van het net te laden is 'Laden van het net' handiger."
   },
   "args": [
     {
@@ -40,7 +40,7 @@
       "name": "power",
       "type": "number",
       "required": false,
-      "min": 0,
+      "min": -5000,
       "max": 5000,
       "step": 1,
       "title": {

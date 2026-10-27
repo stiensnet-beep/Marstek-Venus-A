@@ -29,6 +29,36 @@ module.exports = class MarstekVenusApp extends Homey.App {
       return true;
     });
 
+    // Laden van het net: Passive met een vast vermogen, tot een doel-SOC of een
+    // maximale duur; de batterij zet zichzelf daarna terug (zie device.js).
+    this.homey.flow.getActionCard('charge_from_grid').registerRunListener(async (args) => {
+      const device = args.device;
+      if (!device || typeof device.startChargeSession !== 'function') {
+        throw new Error('Marstek Venus A apparaat niet gevonden');
+      }
+      await device.startChargeSession({
+        power: Number(args.power),
+        targetSoc: Number(args.soc),
+        minutes: Number(args.minutes),
+      });
+      return true;
+    });
+
+    this.homey.flow.getActionCard('stop_charge').registerRunListener(async (args) => {
+      const device = args.device;
+      if (!device || typeof device.stopChargeSession !== 'function') {
+        throw new Error('Marstek Venus A apparaat niet gevonden');
+      }
+      await device.stopChargeSession();
+      return true;
+    });
+
+    this.homey.flow.getConditionCard('charge_active').registerRunListener(async (args) => {
+      const device = args.device;
+      return Boolean(device && typeof device.isChargeSessionActive === 'function'
+        && device.isChargeSessionActive());
+    });
+
     // App-level condition card: is the battery currently in a specific mode?
     this.homey.flow.getConditionCard('mode_is').registerRunListener(async (args) => {
       const device = args.device;

@@ -1,0 +1,21 @@
+{
+  "title": {
+    "en": "Stop charging from the grid",
+    "nl": "Stop laden van het net"
+  },
+  "hint": {
+    "en": "Ends a running 'Charge from the grid' session and switches the battery back to the 'on' mode from the device settings (normally Auto = self consumption). Without a running session the battery is only switched back if it is in Passive mode.",
+    "nl": "Beëindigt een lopende sessie 'Laden van het net' en zet de batterij terug in de aan-modus uit de apparaatinstellingen (normaal Auto = zelfconsumptie). Loopt er geen sessie, dan wordt de batterij alleen teruggezet als hij in Passive staat."
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=venus_a",
+      "title": {
+        "en": "Battery",
+        "nl": "Batterij"
+      }
+    }
+  ]
+}

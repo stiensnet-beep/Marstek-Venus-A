@@ -1,0 +1,17 @@
+{
+  "title": {
+    "en": "Charging from the grid !{{is|is not}} running",
+    "nl": "Laden van het net !{{loopt|loopt niet}}"
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=venus_a",
+      "title": {
+        "en": "Battery",
+        "nl": "Batterij"
+      }
+    }
+  ]
+}

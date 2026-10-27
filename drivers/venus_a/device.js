@@ -8,6 +8,7 @@ const {
   rssiQuality,
   normalizeMode,
   DEFAULT_PORT,
+  PASSIVE_CHARGE_SIGN,
 } = require('../../lib/marstek');
 
 const MAX_FAILURES = 3;
@@ -43,6 +44,16 @@ const WIFI_EVERY = 5;
  */
 const DEFAULT_MODE_MAX_AGE = 45 * 1000;
 
+/** Store-sleutel van een lopende laadsessie, zodat die een herstart van de app overleeft. */
+const SESSION_KEY = 'charge_session';
+
+/**
+ * Speling (s) op cd_time van Passive. De app beëindigt de sessie zelf op de
+ * eindtijd en zet de batterij terug; de aftelklok van de batterij loopt iets
+ * langer en is alleen het vangnet als Homey op dat moment niet kan schakelen.
+ */
+const CD_TIME_MARGIN = 120;
+
 module.exports = class VenusADevice extends Homey.Device {
 
   async onInit() {
@@ -56,6 +67,9 @@ module.exports = class VenusADevice extends Homey.Device {
     this._modeUpdatedAt = 0;
     this._pollCount = 0;
     this._syncing = false;
+    this._session = this.getStoreValue(SESSION_KEY) || null;
+    this._sessionTimer = null;
+    this._restorePending = false;
 
     this._modeChangedTrigger = this.homey.flow.getDeviceTriggerCard('mode_changed');
 
@@ -70,6 +84,7 @@ module.exports = class VenusADevice extends Homey.Device {
     await this._migrateClass();
 
     this._startPolling();
+    this._scheduleSessionEnd();
     this._sync().catch((err) => this._onFailure(err));
   }
 
@@ -138,6 +153,7 @@ module.exports = class VenusADevice extends Homey.Device {
 
   async onDeleted() {
     this._stopPolling();
+    this._clearSessionTimer();
     if (this._client) {
       this._client.close();
       this._client = null;
@@ -188,6 +204,15 @@ module.exports = class VenusADevice extends Homey.Device {
   async setMode(mode, options = {}) {
     if (!mode) throw new Error('Geen modus opgegeven');
 
+    // Elke andere schakeling (aan/uit, de modus-kaart) beëindigt een lopende
+    // laadsessie en een nog openstaand terugzetten: wie de batterij daarna
+    // bedient (bijvoorbeeld de Tesla-flow die hem uitzet), heeft voorrang.
+    const { keepSession, ...protocolOptions } = options;
+    if (!keepSession) {
+      this._restorePending = false;
+      if (this._session) await this._clearSession(`modus ${mode} van buitenaf ingesteld`);
+    }
+
     const settings = this._getSettings();
     const client = this._getClient();
 
@@ -202,7 +227,7 @@ module.exports = class VenusADevice extends Homey.Device {
       // terugleescontrole hieronder ruim binnen Homey's 30s flow-timeout blijft.
       attempts: 3,
       retryDelay: 1500,
-      ...options,
+      ...protocolOptions,
     });
 
     // `set_result` is not a reliable success indicator, so read the mode back.
@@ -237,6 +262,67 @@ module.exports = class VenusADevice extends Homey.Device {
     this.log(`Schakelen naar modus ${mode} (${on ? 'aan' : 'uit'})`);
     await this.setMode(mode, { enable: on });
     return true;
+  }
+
+  /**
+   * Laden van het net: Passive met een vast vermogen tot `targetSoc` of tot
+   * `minutes` om zijn. Daarna zet _checkChargeSession() de batterij terug in de
+   * aan-modus. cd_time loopt CD_TIME_MARGIN langer als vangnet voor het geval
+   * Homey op de eindtijd niet bij de batterij kan.
+   *
+   * @param {object} options
+   * @param {number} options.power     laadvermogen in W (positief)
+   * @param {number} options.targetSoc stoppen bij dit percentage
+   * @param {number} options.minutes   maximale duur
+   * @returns {Promise<boolean>} false als het doel al bereikt is
+   */
+  async startChargeSession({ power, targetSoc, minutes }) {
+    const watt = Math.round(Math.abs(Number(power)));
+    const target = Math.max(1, Math.min(100, Math.round(Number(targetSoc))));
+    const duration = Math.max(1, Math.round(Number(minutes))) * 60;
+    if (!Number.isFinite(watt) || watt <= 0) throw new Error('Geen laadvermogen opgegeven');
+    if (!Number.isFinite(target) || !Number.isFinite(duration)) {
+      throw new Error('Doel of duur ontbreekt');
+    }
+
+    const soc = this.getCapabilityValue('measure_battery');
+    if (Number.isFinite(soc) && soc >= target) {
+      this.log(`Laden van het net overgeslagen: ${soc}% is al >= doel ${target}%`);
+      return false;
+    }
+
+    // Eerst de sessie vastleggen, dan pas schakelen: zo ziet de uitleesronde die
+    // tijdens het schakelen loopt de sessie al en grijpt hij niet in.
+    await this._setSession({ power: watt, targetSoc: target, endsAt: Date.now() + duration * 1000 });
+
+    try {
+      await this.setMode('Passive', {
+        power: PASSIVE_CHARGE_SIGN * watt,
+        cdTime: duration + CD_TIME_MARGIN,
+        keepSession: true,
+      });
+    } catch (err) {
+      await this._clearSession('schakelen naar Passive mislukt');
+      throw err;
+    }
+
+    this.log(`Laden van het net: ${watt} W tot ${target}%, hooguit ${duration / 60} min`);
+    return true;
+  }
+
+  /** Lopende laadsessie stoppen en de batterij terugzetten in de aan-modus. */
+  async stopChargeSession() {
+    const passive = String(this._mode || '').toLowerCase() === 'passive';
+    if (!this._session && !passive) {
+      this.log('Stop laden: er loopt geen laadsessie');
+      return false;
+    }
+    await this._endChargeSession('gestopt via flow');
+    return true;
+  }
+
+  isChargeSessionActive() {
+    return Boolean(this._session);
   }
 
   /* ---------------------------------------------------------------- *
@@ -354,6 +440,7 @@ module.exports = class VenusADevice extends Homey.Device {
     }
 
     await this._applyStatus(status);
+    await this._checkChargeSession(status);
 
     // Energie en temperatuur: één keer meteen, daarna af en toe (zie ENERGY_EVERY).
     this._pollCount += 1;
@@ -368,6 +455,95 @@ module.exports = class VenusADevice extends Homey.Device {
     }
 
     this._onSuccess();
+  }
+
+  /**
+   * Na elke uitleesronde: is de laadsessie klaar? Klaar betekent doel bereikt
+   * of tijd om; dan gaat de batterij terug in de aan-modus. Staat de batterij
+   * niet meer in Passive, dan heeft iets anders (de Marstek-app, een schakeling
+   * buiten Homey om) het overgenomen: de sessie stopt en er wordt niets
+   * teruggezet. Mislukte het terugzetten eerder (de UDP-server van de batterij
+   * is wisselvallig), dan wordt dat hier opnieuw geprobeerd.
+   *
+   * @param {object} status parseStatus(ES.GetMode)
+   */
+  async _checkChargeSession(status) {
+    if (this._restorePending) {
+      if (this._mode && String(this._mode).toLowerCase() !== 'passive') {
+        this._restorePending = false;
+        this.log(`Terugzetten niet meer nodig: batterij staat al in ${this._mode}`);
+      } else {
+        await this._restoreAfterSession();
+      }
+      return;
+    }
+
+    const session = this._session;
+    if (!session) return;
+
+    if (this._mode && String(this._mode).toLowerCase() !== 'passive') {
+      await this._clearSession(`batterij staat nu in ${this._mode}`);
+      return;
+    }
+
+    const soc = status && Number.isFinite(status.soc) ? status.soc : null;
+    if (soc !== null && soc >= session.targetSoc) {
+      await this._endChargeSession(`doel ${session.targetSoc}% bereikt`);
+    } else if (Date.now() >= session.endsAt) {
+      await this._endChargeSession('maximale duur verstreken');
+    }
+  }
+
+  async _endChargeSession(reason) {
+    await this._clearSession(reason);
+    this._restorePending = true;
+    await this._restoreAfterSession();
+  }
+
+  async _restoreAfterSession() {
+    const { modeOn } = this._getSettings();
+    try {
+      await this.setMode(modeOn, { enable: true, keepSession: true });
+      this._restorePending = false;
+      this.log(`Na het laden teruggezet naar ${modeOn}`);
+    } catch (err) {
+      this.error(`Terugzetten naar ${modeOn} mislukt, volgende ronde opnieuw:`, err.message);
+    }
+  }
+
+  async _setSession(session) {
+    this._session = session;
+    this._restorePending = false;
+    await this.setStoreValue(SESSION_KEY, session).catch((err) => this.log(err.message));
+    this._scheduleSessionEnd();
+  }
+
+  async _clearSession(reason) {
+    if (!this._session) return;
+    this._session = null;
+    this._clearSessionTimer();
+    await this.unsetStoreValue(SESSION_KEY).catch((err) => this.log(err.message));
+    this.log(`Laadsessie beëindigd: ${reason}`);
+  }
+
+  /**
+   * Een extra uitleesronde precies op de eindtijd, zodat het terugzetten niet
+   * tot een poll-ronde later hoeft te wachten (en ook werkt als pollen uit staat).
+   */
+  _scheduleSessionEnd() {
+    this._clearSessionTimer();
+    if (!this._session) return;
+    const wait = Math.max(1000, this._session.endsAt - Date.now() + 1000);
+    this._sessionTimer = this.homey.setTimeout(() => {
+      this._sessionTimer = null;
+      this._sync().catch((err) => this._onFailure(err));
+    }, wait);
+  }
+
+  _clearSessionTimer() {
+    if (!this._sessionTimer) return;
+    this.homey.clearTimeout(this._sessionTimer);
+    this._sessionTimer = null;
   }
 
   /**

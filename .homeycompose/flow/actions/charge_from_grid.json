@@ -1,0 +1,70 @@
+{
+  "title": {
+    "en": "Charge from the grid",
+    "nl": "Laden van het net"
+  },
+  "titleFormatted": {
+    "en": "Charge with [[power]] W up to [[soc]]% for at most [[minutes]] minutes",
+    "nl": "Laden met [[power]] W tot [[soc]]%, hooguit [[minutes]] minuten"
+  },
+  "hint": {
+    "en": "Puts the battery in Passive mode with a fixed charging power. The app stops by itself when the battery reaches the target or the time is up, and then switches back to the 'on' mode from the device settings (normally Auto = self consumption). If someone else changes the mode in the meantime (another flow, the Marstek app), the session ends and nothing is switched back. The battery also stops on its own shortly after the end time, so it never keeps charging if Homey is unavailable.",
+    "nl": "Zet de batterij in Passive met een vast laadvermogen. De app stopt zelf zodra het doel bereikt is of de tijd om is, en zet de batterij dan terug in de aan-modus uit de apparaatinstellingen (normaal Auto = zelfconsumptie). Verandert iemand anders intussen de modus (een andere flow, de Marstek-app), dan stopt de sessie en wordt er niets teruggezet. De batterij stopt kort na de eindtijd ook zelf, dus hij blijft nooit doorladen als Homey even weg is."
+  },
+  "args": [
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=venus_a",
+      "title": {
+        "en": "Battery",
+        "nl": "Batterij"
+      }
+    },
+    {
+      "name": "power",
+      "type": "number",
+      "min": 50,
+      "max": 5000,
+      "step": 1,
+      "title": {
+        "en": "Power (W)",
+        "nl": "Vermogen (W)"
+      },
+      "placeholder": {
+        "en": "e.g. 1500",
+        "nl": "bijv. 1500"
+      }
+    },
+    {
+      "name": "soc",
+      "type": "number",
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "title": {
+        "en": "Target (%)",
+        "nl": "Doel (%)"
+      },
+      "placeholder": {
+        "en": "e.g. 90",
+        "nl": "bijv. 90"
+      }
+    },
+    {
+      "name": "minutes",
+      "type": "number",
+      "min": 1,
+      "max": 720,
+      "step": 1,
+      "title": {
+        "en": "Maximum duration (minutes)",
+        "nl": "Maximale duur (minuten)"
+      },
+      "placeholder": {
+        "en": "e.g. 60",
+        "nl": "bijv. 60"
+      }
+    }
+  ]
+}
