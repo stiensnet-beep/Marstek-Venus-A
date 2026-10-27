@@ -54,6 +54,14 @@ const SESSION_KEY = 'charge_session';
  */
 const CD_TIME_MARGIN = 120;
 
+/**
+ * Nazorg (ms) na een laadsessie. Gemeten op een Venus A (fw 148, 27-10-2026):
+ * loopt cd_time af nadat de app al naar Auto is teruggezet, dan springt de
+ * batterij een paar minuten naar Passive met 0 W. Zolang de nazorg loopt,
+ * wordt zo'n Passive zonder sessie teruggezet naar de aan-modus.
+ */
+const AFTERCARE_MS = (CD_TIME_MARGIN + 600) * 1000;
+
 module.exports = class VenusADevice extends Homey.Device {
 
   async onInit() {
@@ -70,6 +78,7 @@ module.exports = class VenusADevice extends Homey.Device {
     this._session = this.getStoreValue(SESSION_KEY) || null;
     this._sessionTimer = null;
     this._restorePending = false;
+    this._aftercareUntil = 0;
 
     this._modeChangedTrigger = this.homey.flow.getDeviceTriggerCard('mode_changed');
 
@@ -210,6 +219,7 @@ module.exports = class VenusADevice extends Homey.Device {
     const { keepSession, ...protocolOptions } = options;
     if (!keepSession) {
       this._restorePending = false;
+      this._aftercareUntil = 0;
       if (this._session) await this._clearSession(`modus ${mode} van buitenaf ingesteld`);
     }
 
@@ -479,9 +489,17 @@ module.exports = class VenusADevice extends Homey.Device {
     }
 
     const session = this._session;
-    if (!session) return;
+    const passive = String(this._mode || '').toLowerCase() === 'passive';
+    if (!session) {
+      if (passive && Date.now() < this._aftercareUntil) {
+        this.log('Passive na afloop van cd_time; terug naar de aan-modus');
+        this._restorePending = true;
+        await this._restoreAfterSession();
+      }
+      return;
+    }
 
-    if (this._mode && String(this._mode).toLowerCase() !== 'passive') {
+    if (this._mode && !passive) {
       await this._clearSession(`batterij staat nu in ${this._mode}`);
       return;
     }
@@ -496,6 +514,7 @@ module.exports = class VenusADevice extends Homey.Device {
 
   async _endChargeSession(reason) {
     await this._clearSession(reason);
+    this._aftercareUntil = Date.now() + AFTERCARE_MS;
     this._restorePending = true;
     await this._restoreAfterSession();
   }
